@@ -1,0 +1,45 @@
+{
+  "name": "travel-erp-backend",
+  "version": "1.0.0",
+  "description": "Express.js backend for Journey Guide ERP system",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "keywords": [
+    "travel",
+    "erp",
+    "express",
+    "typescript"
+  ],
+  "author": "journeyguidetrips-rgb",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.11.5",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5",
+    "multer": "^2.1.0",
+    "sharp": "^0.33.3",
+    "uuid": "^14.0.0",
+    "axios": "^1.6.8",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.7",
+    "@types/pg": "^8.11.5",
+    "@types/multer": "^1.4.11",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.4.5",
+    "ts-node-dev": "^2.0.0",
+    "eslint": "^9.1.1",
+    "typescript-eslint": "^8.0.0",
+    "prettier": "^3.2.5"
+  }
+}
