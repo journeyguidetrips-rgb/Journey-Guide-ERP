@@ -36,13 +36,13 @@ export const getItinerary = async (id: string) => {
 };
 
 // Get all itineraries for a user
-export const getUserItineraries = async (userId: number) => {
+/* export const getUserItineraries = async (userId: number) => {
   const result = await pool.query(
     `SELECT * FROM itineraries WHERE user_id = $1 ORDER BY created_at DESC`,
     [userId]
   );
   return result.rows;
-};
+}; */
 
 // Update itinerary content + HTML
 export const updateItinerary = async (
@@ -88,4 +88,78 @@ export const deleteItinerary = async (id: string) => {
     [id]
   );
   return result.rowCount > 0;
+};
+
+// Get all itineraries for a user
+interface GetItinerariesFilters {
+  userId: number;
+  page?: number;
+  limit?: number;
+  search?: string;
+  vendor?: string;
+  status?: 'Draft' | 'Published';
+  date?: string;
+}
+
+export const getUserItineraries = async ({
+  userId,
+  page = 1,
+  limit = 10,
+  search,
+  vendor,
+  status,
+  date,
+}: GetItinerariesFilters) => {
+  const offset = (page - 1) * limit;
+
+  // 1️⃣ Build WHERE conditions & filter values
+  const conditions: string[] = ['user_id = $1'];
+  const filterValues: any[] = [userId];
+  let paramIndex = 2;
+
+  if (search) {
+    conditions.push(`client_name ILIKE $${paramIndex}`);
+    filterValues.push(`%${search}%`);
+    paramIndex++;
+  }
+  if (vendor) {
+    conditions.push(`vendor_name ILIKE $${paramIndex}`);
+    filterValues.push(`%${vendor}%`);
+    paramIndex++;
+  }
+  if (status) {
+    conditions.push(`status = $${paramIndex}`);
+    filterValues.push(status);
+    paramIndex++;
+  }
+  if (date) {
+    conditions.push(`DATE(created_at) = $${paramIndex}`);
+    filterValues.push(date);
+    paramIndex++;
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  // 2️⃣ Data Query (needs LIMIT & OFFSET)
+  const dataQuery = `
+    SELECT * FROM itineraries 
+    WHERE ${whereClause} 
+    ORDER BY created_at DESC 
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+  const dataValues = [...filterValues, limit, offset];
+  const dataResult = await pool.query(dataQuery, dataValues);
+
+  // 3️⃣ Count Query (ONLY needs filter values, NO pagination)
+  const countQuery = `SELECT COUNT(*) FROM itineraries WHERE ${whereClause}`;
+  const countResult = await pool.query(countQuery, filterValues);
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  return {
+    itineraries: dataResult.rows,
+    total,
+    page,
+    limit,
+    hasMore: offset + dataResult.rows.length < total,
+  };
 };

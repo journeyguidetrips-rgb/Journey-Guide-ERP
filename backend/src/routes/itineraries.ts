@@ -107,12 +107,40 @@ router.post('/upload', authenticate, upload.single('file'), async (req: Request,
 });
 
 // Get user's itineraries
-router.get('/', authenticate, async (req: Request, res: Response) => {
+/* router.get('/', authenticate, async (req: Request, res: Response) => {
   try {
     const itineraries = await getUserItineraries(req.user!.id);
     res.json({
       success: true,
       itineraries,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+}); */
+
+// Get user's itineraries
+router.get('/', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { page, limit, search, vendor, status, date } = req.query;
+
+    const result = await getUserItineraries({
+      userId: req.user!.id,
+      page: page ? parseInt(page as string) : 1,
+      limit: limit ? parseInt(limit as string) : 10,
+      search: search as string,
+      vendor: vendor as string,
+      status: status as 'Draft' | 'Published',
+      date: date as string,
+    });
+
+    res.json({
+      success: true,
+      itineraries: result.itineraries,
+      total: result.total,  // ✅ Critical: return total count
+      page: result.page,
+      limit: result.limit,
+      hasMore: result.hasMore,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
