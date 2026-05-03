@@ -35,15 +35,6 @@ export const getItinerary = async (id: string) => {
   return result.rows[0];
 };
 
-// Get all itineraries for a user
-/* export const getUserItineraries = async (userId: number) => {
-  const result = await pool.query(
-    `SELECT * FROM itineraries WHERE user_id = $1 ORDER BY created_at DESC`,
-    [userId]
-  );
-  return result.rows;
-}; */
-
 // Update itinerary content + HTML
 export const updateItinerary = async (
   id: string,
@@ -51,9 +42,6 @@ export const updateItinerary = async (
   template: string
 ) => {
   try {
-    // const cmd = `pandoc "${content}" --template="${template}" --from=markdown+raw_html --to=html5 --standalone`;
-    // const { stdout } = await execAsync(cmd); // capture HTML directly
-
     const result = await pool.query(
       `UPDATE itineraries
        SET content = $2, updated_at = CURRENT_TIMESTAMP, html_content = $3

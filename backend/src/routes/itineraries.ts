@@ -107,19 +107,6 @@ router.post('/upload', authenticate, upload.single('file'), async (req: Request,
 });
 
 // Get user's itineraries
-/* router.get('/', authenticate, async (req: Request, res: Response) => {
-  try {
-    const itineraries = await getUserItineraries(req.user!.id);
-    res.json({
-      success: true,
-      itineraries,
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-}); */
-
-// Get user's itineraries
 router.get('/', authenticate, async (req: Request, res: Response) => {
   try {
     const { page, limit, search, vendor, status, date } = req.query;
