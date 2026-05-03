@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{title}}</title>
+  {{meta-tags}}
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+
+  <style>
+    /* ── Brand tokens ── */
+    :root {
+      --jg-navy:       #0D1B4B;
+      --jg-gold:       #B8922A;
+      --jg-gold-soft:  #d4a94e;
+      --jg-gold-faint: #f5edd8;
+      --jg-off-white:  #f9f7f4;
+      --jg-ink:        #1c1c2e;
+      --jg-muted:      #7a7a8c;
+      --jg-rule:       #e6e2da;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, "Noto Sans",
+               "Liberation Sans", sans-serif;
+      background: #edeae5;
+      margin: 0;
+    }
+
+    /* ── Page shell — fixed A4-ish width, scaled up with zoom ── */
+    .jg-page {
+      width: 1191px;
+      margin: 0 auto;
+      background: #fff;
+      box-shadow: 0 6px 40px rgba(0,0,0,.13);
+      overflow: hidden;
+    }
+
+    /* ════════════════════════════
+       HEADER
+       Uses Bootstrap grid internally
+       so columns stay proportional
+    ════════════════════════════ */
+    .jg-header {
+      background: var(--jg-navy);
+      padding: 33px 42px 30px;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Decorative gold hairlines */
+    .jg-deco-line-1 {
+      top: 0; bottom: 0; right: 80px;
+      width: 1px; background: rgba(184,146,42,.22);
+    }
+    .jg-deco-line-2 {
+      top: 0; bottom: 0; right: 100px;
+      width: 1px; background: rgba(184,146,42,.10);
+    }
+
+    /* Logo box */
+    .jg-logo-box {
+      width: 75px; height: 75px;
+      border: 3px solid var(--jg-gold);
+      border-radius: 7.5px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .jg-logo-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* Brand text */
+    .jg-brand-name {
+      font-size: 31.5px; font-weight: 600;
+      color: #fff;
+      letter-spacing: 3px; text-transform: uppercase;
+      line-height: 1; margin-bottom: 6px;
+    }
+    .jg-brand-name span { color: var(--jg-gold-soft); }
+
+    .jg-brand-sub {
+      font-size: 10.5px; color: var(--jg-gold);
+      letter-spacing: 4.2px; text-transform: uppercase;
+      margin-bottom: 7.5px;
+    }
+    .jg-brand-rule { width: 39px; height: 1.5px; background: rgba(184,146,42,.4); }
+
+    /* Contact column — right-aligned */
+    .jg-contact-label {
+      font-size: 10.5px; letter-spacing: 2px; text-transform: uppercase;
+      color: rgba(255,255,255,.28); text-align: right; margin-bottom: 5px;
+    }
+    .jg-contact-row {
+      display: flex; align-items: center;
+      justify-content: flex-end; gap: 9px;
+      margin-bottom: 6px;
+    }
+    .jg-contact-row:last-child { margin-bottom: 0; }
+    .jg-contact-val {
+      font-size: 13.5px; color: rgba(255,255,255,.75);
+      text-decoration: none; white-space: nowrap;
+    }
+    .jg-contact-val:hover { color: var(--jg-gold-soft); text-decoration: none; }
+    .jg-icon-pill {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(184,146,42,.28);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .jg-icon-pill .bi { font-size: 12.75px; color: var(--jg-gold-soft); line-height: 1; }
+
+    /* Gold shimmer line below header */
+    .jg-shimmer {
+      height: 2px;
+      background: linear-gradient(90deg, var(--jg-gold) 0%, var(--jg-gold-soft) 45%, rgba(184,146,42,.12) 100%);
+    }
+
+    /* ════════════════════════════
+       DOCUMENT STRIP
+    ════════════════════════════ */
+    .jg-strip {
+      background: var(--jg-off-white);
+      border-bottom: 1px solid var(--jg-rule);
+      display: flex; align-items: stretch; min-height: 30px;
+    }
+    .jg-strip-type {
+      background: var(--jg-navy); color: #fff;
+      font-size: 10.5px; font-weight: 500;
+      letter-spacing: 3px; text-transform: uppercase;
+      padding: 0 16px;
+      display: flex; align-items: center; flex-shrink: 0;
+    }
+    .jg-strip-meta {
+      display: flex; align-items: center;
+      font-size: 12px; color: var(--jg-muted);
+    }
+    .jg-strip-item {
+      padding: 0 14px;
+      border-right: 1px solid var(--jg-rule);
+      line-height: 30px; white-space: nowrap;
+    }
+    .jg-strip-item strong { color: var(--jg-ink); font-weight: 500; }
+
+    /* ════════════════════════════
+       CONTENT
+    ════════════════════════════ */
+    .jg-body { padding: 39px 45px 54px; }
+
+    /* Typography */
+    .jg-body p  { font-size: 17.25px; color: var(--jg-ink); line-height: 1.85; margin-bottom: 12px; }
+    .jg-body em { font-style: italic; color: var(--jg-muted); }
+    .jg-body strong { font-weight: 600; color: var(--jg-ink); }
+    .jg-body hr { border-top: 1px solid var(--jg-rule); margin: 16px 0; }
+    .jg-body img { max-width: 100%; height: auto; display: block; margin: 10px auto; }
+
+    .jg-body h1 {
+      font-size: 28.5px; font-weight: 600; color: var(--jg-navy);
+      border-bottom: 3px solid var(--jg-navy);
+      padding-bottom: 9px; margin: 39px 0 12px;
+      position: relative;
+    }
+    .jg-body h1::after {
+      content: ""; position: absolute; bottom: -3px; left: 0;
+      width: 22px; height: 3px;
+    }
+    .jg-body h2 {
+      font-size: 22.5px; font-weight: 600; color: var(--jg-navy);
+      border-bottom: 1.5px solid var(--jg-navy);
+      padding-bottom: 7.5px; margin: 30px 0 10.5px;
+    }
+    .jg-body h3 {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin: 27px 0 12px;
+      font-size: 16.5px;
+      font-weight: 600;
+      color: var(--jg-navy);
+      padding: 0;
+      position: static;
+    }
+    .jg-body h3::before { display: none; }
+    .jg-body h3::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--jg-rule);
+    }
+
+    /* JS injects the pill span — styled here */
+    .jg-day-pill {
+      display: inline-flex;
+      align-items: center;
+      background: var(--jg-navy);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 11px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* ── H4: Activity heading — gold-bordered pill badge + text ── */
+    .jg-body h4 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0 5px;
+      font-size: 16.5px;
+      font-weight: 600;
+      color: var(--jg-navy);
+      padding: 0;
+    }
+
+    .jg-activity-type {
+      display: inline-flex;
+      align-items: center;
+      background: var(--jg-off-white);
+      border: 1px solid var(--jg-gold);
+      color: var(--jg-gold);
+      font-size: 11.25px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .jg-activity-label {
+      color: var(--jg-navy);
+      font-size: 16.5px;
+      font-weight: 600;
+    }
+
+    /* ── Tables ─────────────────────────────────────────
+       Pandoc emits plain <table> tags with no class.
+       We target them directly inside .jg-body so we do
+       NOT depend on Bootstrap's .table class being present.
+    ───────────────────────────────────────────────────── */
+    .jg-body table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 16.5px;
+      margin: 10px 0 16px;
+    }
+    .jg-body table thead tr {
+      background: var(--jg-navy);
+    }
+    .jg-body table thead th {
+      color: #fff;
+      font-size: 13.5px; font-weight: 500;
+      letter-spacing: .5px; text-transform: uppercase;
+      padding: 8px 11px; border: none;
+      text-align: left;
+    }
+    .jg-body table tbody tr {
+      border-bottom: 1px solid var(--jg-rule);
+    }
+    .jg-body table tbody tr:nth-child(even) {
+      background: var(--jg-off-white);
+    }
+    .jg-body table tbody td {
+      padding: 7px 11px;
+      color: var(--jg-ink);
+      vertical-align: middle;
+      text-align: left;
+    }
+    /* Right-align last column only when .amount-table class is present */
+    .jg-body table.amount-table thead th:last-child { text-align: right; }
+    .jg-body table.amount-table tbody td:last-child  { text-align: right; }
+    .jg-body table.amount-table tfoot td:last-child  { text-align: right; }
+
+    /* Key-value tables (no thead) — first col bold navy */
+    .jg-body table:not(:has(thead)) td:first-child {
+      font-weight: 500; color: var(--jg-navy); width: 40%;
+    }
+    .jg-body table tbody td strong { color: var(--jg-navy); }
+
+    /* tfoot for totals */
+    .jg-body table tfoot td {
+      background: var(--jg-navy); color: #fff;
+      font-weight: 600; font-size: 16.5px;
+      padding: 8px 11px; border: none;
+    }
+    .jg-body table tfoot td:last-child { text-align: right; }
+
+    /* ── Lists ── */
+    .jg-body ul {
+      list-style: none; padding: 0; margin: 8px 0 14px;
+    }
+    .jg-body ul li {
+      font-size: 17.25px; color: var(--jg-ink); line-height: 1.75;
+      padding: 4px 0 4px 15px; position: relative;
+      border-bottom: 1px solid var(--jg-rule);
+    }
+    .jg-body ul li:last-child { border-bottom: none; }
+    .jg-body ul li::before {
+      content: ""; position: absolute; left: 0; top: 12px;
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--jg-gold);
+    }
+    .jg-body ol { margin: 8px 0 14px 16px; padding: 0; }
+    .jg-body ol li {
+      font-size: 17.25px; color: var(--jg-ink);
+      line-height: 1.75; padding: 3px 0;
+    }
+
+    /* Blockquote — Amount in Words */
+    .jg-body blockquote {
+      border-left: 3px solid var(--jg-gold);
+      background: var(--jg-gold-faint);
+      margin: 10px 0; padding: 9px 13px;
+      font-size: 16.5px; color: var(--jg-ink);
+      font-style: italic;
+      border-radius: 0 4px 4px 0;
+    }
+    .jg-body blockquote p { margin: 0; font-size: 16.5px; }
+
+    /* ════════════════════════════
+       FOOTER
+    ════════════════════════════ */
+    .jg-footer {
+      background: var(--jg-navy);
+      padding: 18px 45px;
+    }
+    .jg-footer-sign {
+      font-size: 13.5px; color: rgba(255,255,255,.5); line-height: 1.8;
+    }
+    .jg-footer-sign strong {
+      display: block; font-size: 15px;
+      color: var(--jg-gold-soft); font-weight: 500;
+    }
+    .jg-footer-right {
+      font-size: 12px; color: rgba(255,255,255,.3);
+      text-align: right; line-height: 1.9;
+    }
+    .jg-footer-right a { color: rgba(255,255,255,.38); text-decoration: none; }
+
+    .jg-gold-bar {
+      height: 3px;
+      background: linear-gradient(90deg, var(--jg-gold) 0%, var(--jg-gold-soft) 50%, rgba(184,146,42,.15) 100%);
+    }
+
+    @media print {
+      body { background: white; padding: 0; }
+      .jg-page { box-shadow: none; zoom: 1; width: 100%; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="jg-page">
+
+  <!-- ══ HEADER ══ -->
+  <div class="jg-header">
+    <!-- Decorative lines as divs (not pseudo-elements, so zoom-safe) -->
+    <div class="jg-deco-line-1"></div>
+    <div class="jg-deco-line-2"></div>
+
+    <!-- Bootstrap row: 7 cols brand / 5 cols contact -->
+    <div class="row align-items-center g-0">
+
+      <!-- Brand -->
+      <div class="col-7">
+        <div class="d-flex align-items-center gap-4">
+          <div class="jg-logo-box">
+            <img src="{{logoBase64}}" alt="Journey Guide"/>
+          </div>
+          <div>
+            <div class="jg-brand-name">Journey <span>Guide</span></div>
+            <div class="jg-brand-sub">Discover the World with Us</div>
+            <div class="jg-brand-rule"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact -->
+      <div class="col-5">
+        <div class="jg-contact-row">
+          <span class="jg-contact-val">journey.guide@outlook.com</span>
+          <div class="jg-icon-pill"><i class="bi bi-envelope"></i></div>
+        </div>
+        <div class="jg-contact-row">
+          <a href="tel:+919270376651" class="jg-contact-val">+91 92703 76651</a>
+          <div class="jg-icon-pill"><i class="bi bi-telephone"></i></div>
+        </div>
+        <div class="jg-contact-row">
+          <a href="https://wa.me/919270376651" target="_blank" class="jg-contact-val">+91 92703 76651</a>
+          <div class="jg-icon-pill"><i class="bi bi-whatsapp"></i></div>
+        </div>
+        <div class="jg-contact-row">
+          <a href="https://www.instagram.com/journey_guide_/" target="_blank" class="jg-contact-val">@journey_guide_</a>
+          <div class="jg-icon-pill"><i class="bi bi-instagram"></i></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Gold shimmer -->
+  <div class="jg-shimmer"></div>
+
+  <!-- ══ DOC STRIP ══ -->
+  <!--div class="jg-strip">
+    <div class="jg-strip-type">$if(doctype)$$doctype$$else$Document$endif$</div>
+    <div class="jg-strip-meta">
+      $if(refno)$<div class="jg-strip-item">Ref &nbsp;<strong>$refno$</strong></div>$endif$
+      $if(date)$<div class="jg-strip-item">Date &nbsp;<strong>$date$</strong></div>$endif$
+      $if(client)$<div class="jg-strip-item">To &nbsp;<strong>$client$</strong></div>$endif$
+    </div>
+  </div-->
+
+  <!-- ══ CONTENT ══ -->
+  <div class="jg-body">
+    {{body}}
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <div class="jg-footer">
+    <div class="row align-items-center g-0">
+      <div class="col-6">
+        <div class="jg-footer-sign">
+          Thank you for booking with us
+          <strong>Team Journey Guide</strong>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="jg-footer-right">
+          journey.guide@outlook.com
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="jg-gold-bar"></div>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function() {
+  document.querySelectorAll(".jg-body h3").forEach(function(h3) {
+    var text = h3.textContent.trim();
+    h3.innerHTML = "<span class=\"jg-day-pill\">" + text + "</span>";
+  });
+
+  document.querySelectorAll(".jg-body h4").forEach(function(h4) {
+    var text = h4.textContent.trim();
+    var parts = text.split(" | ");
+    if (parts.length >= 2) {
+      var type  = parts.pop().trim();
+      var title = parts.join(" | ").trim();
+      h4.innerHTML =
+        "<span class=\"jg-activity-type\">" + type + "</span>" +
+        "<span class=\"jg-activity-label\">" + title + "</span>";
+    } else {
+      h4.innerHTML = "<span class=\"jg-activity-label\">" + text + "</span>";
+    }
+  });
+})();
+</script>
+</body>
+</html>
