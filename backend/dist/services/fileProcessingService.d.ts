@@ -1,9 +1,0 @@
-export declare const extractPdfText: (filePath: string) => Promise<string>;
-export declare const extractPdfText_OLD: (filePath: string) => Promise<string>;
-export declare const extractDocxText: (filePath: string) => Promise<string>;
-export declare const extractTxtText: (filePath: string) => Promise<string>;
-export declare const processUploadedFile: (filePath: string) => Promise<string>;
-export declare const formatAsMarkdown: (text: string) => string;
-export declare const markdownToHtml: (markdown: string) => Promise<string>;
-export declare const cleanItineraryContent: (content: string) => string;
-//# sourceMappingURL=fileProcessingService.d.ts.map

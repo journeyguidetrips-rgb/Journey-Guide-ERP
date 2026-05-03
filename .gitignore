@@ -37,5 +37,11 @@ postgres_data/
 *.sqlite
 
 # Uploads
-/uploads/
-/temp/
+backend/uploads/
+backend/temp/
+frontend/uploads/
+frontend/temp/
+
+# Ignore build artifacts
+backend/dist/
+frontend/dist/
