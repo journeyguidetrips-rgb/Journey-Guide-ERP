@@ -2,12 +2,12 @@ import { CreditCard, FileText, Image, Tag, Archive, TrendingUp } from 'lucide-re
 
 export default function Dashboard() {
   const stats = [
-    { label: 'Total Payments', value: '$0', icon: CreditCard, color: 'bg-blue-500' },
+    { label: 'Total Payments', value: '0', icon: CreditCard, color: 'bg-blue-500' },
     { label: 'Itineraries', value: '0', icon: FileText, color: 'bg-green-500' },
     { label: 'Watermarks', value: '0', icon: Image, color: 'bg-purple-500' },
     { label: 'Placards', value: '0', icon: Tag, color: 'bg-orange-500' },
     { label: 'Archived Files', value: '0', icon: Archive, color: 'bg-red-500' },
-    { label: 'Revenue', value: '$0', icon: TrendingUp, color: 'bg-indigo-500' },
+    { label: 'Revenue', value: '0', icon: TrendingUp, color: 'bg-indigo-500' },
   ]
 
   return (

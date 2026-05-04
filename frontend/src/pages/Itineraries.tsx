@@ -1,15 +1,20 @@
+// src/components/Itineraries.tsx
 import { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { Upload, Edit2, Trash2, Download, X, Search, RefreshCw } from 'lucide-react'
+import { Upload, Edit2, Trash2, Download, X, Search, RefreshCw, Undo2, Shuffle } from 'lucide-react'
 import { useUserStore } from '../stores/userStore'
+import { 
+  ConvertToBookingRequest,
+  ConvertToBookingResponse,
+  ApiErrorResponse,
+} from '../../../backend/src/types/booking'
 
-// Add this interface for filters
 interface SearchFilters {
-  query: string;      // client_name
-  vendorName: string; // vendor_name
-  status: '' | 'Draft' | 'Published';
-  date: string;       // YYYY-MM-DD
+  query: string;
+  vendorName: string;
+  status: '' | 'Draft' | 'Published' | 'Converted';
+  date: string;
 }
 
 interface Itinerary {
@@ -19,15 +24,8 @@ interface Itinerary {
   source_content: string
   content: string
   html_content: string
-  status: 'Draft' | 'Published'
+  status: 'Draft' | 'Published' | 'Converted'
   created_at: string
-}
-
-interface SearchFilters {
-  query: string
-  vendorName: string
-  status: '' | 'Draft' | 'Published'
-  date: string
 }
 
 export default function Itineraries() {
@@ -44,7 +42,6 @@ export default function Itineraries() {
   const [vendorName, setVendorName] = useState('')
   const [clientName, setClientName] = useState('')
 
-  // Add these states
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [filters, setFilters] = useState<SearchFilters>({
@@ -54,23 +51,34 @@ export default function Itineraries() {
     date: ''
   })
 
+  const [showConvertModal, setShowConvertModal] = useState(false)
+  const [convertingItinerary, setConvertingItinerary] = useState<Itinerary | null>(null)
+  const [bookingForm, setBookingForm] = useState({
+    sellingPrice: '',
+    vendorCost: '',
+    phone: '',
+    whatsapp: '',
+    travelDate: '',
+    guests: '1',
+    notes: ''
+  })
+
   const currentPageRef = useRef(1)
   const hasMoreRef = useRef(true)
-
-  // Ref to track if a fetch is in progress (prevents duplicate calls)
   const fetchLock = useRef(false)
-
-  // Intersection Observer ref for infinite scroll
   const observer = useRef<IntersectionObserver | null>(null)
+  const filtersRef = useRef(filters)
+
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
 
   const lastItineraryRef = useCallback((node: HTMLDivElement | null) => {
-    // Always disconnect old observer first
     if (observer.current) {
       observer.current.disconnect()
       observer.current = null
     }
   
-    // Don't observe if loading, no more data, or no node
     if (loadingMore || !hasMoreRef.current || !node) return
   
     observer.current = new IntersectionObserver((entries) => {
@@ -80,9 +88,8 @@ export default function Itineraries() {
     }, { rootMargin: '150px' })
   
     observer.current.observe(node)
-  }, [loadingMore]) // Keep minimal deps; filters accessed via ref
+  }, [loadingMore])
 
-  // Updated fetch function with pagination & filters
   const fetchItineraries = async (reset = false) => {
     if (fetchLock.current) return
     fetchLock.current = true
@@ -92,7 +99,6 @@ export default function Itineraries() {
   
     setIsLoading(true)
     try {
-      // Use filtersRef to always get latest values
       const currentFilters = filtersRef.current
       
       const params = new URLSearchParams({
@@ -115,22 +121,19 @@ export default function Itineraries() {
         setItineraries(newItems)
         currentPageRef.current = 2
       } else {
-        setItineraries(prev => [...prev, ...newItems])
+        setItineraries(prev => {
+          const existingIds = new Set(prev.map(i => i.id))
+          const uniqueNew = newItems.filter(i => !existingIds.has(i.id))
+          return [...prev, ...uniqueNew]
+        })
         currentPageRef.current = targetPage + 1
       }
   
       hasMoreRef.current = (targetPage * 10) < total
       setHasMore(hasMoreRef.current)
-
-      // Inside fetchItineraries, after receiving response:
-      console.log('📦 Backend response:', {
-        itemsReturned: response.data.itineraries?.length,
-        total: response.data.total,
-        hasMore: response.data.hasMore,
-        currentPage: response.data.page,
-      });
   
     } catch (error) {
+      console.error('Fetch error:', error)
       toast.error('Failed to fetch itineraries')
     } finally {
       setIsLoading(false)
@@ -139,60 +142,43 @@ export default function Itineraries() {
   }
 
   const handleApplyFilters = () => {
-    // 1. Update the ref IMMEDIATELY (bypasses async state)
     filtersRef.current = { ...filters }
-    
-    // 2. Reset pagination
     fetchLock.current = false
     currentPageRef.current = 1
     hasMoreRef.current = true
     setPage(1)
     setHasMore(true)
     
-    // 3. Disconnect old observer
     if (observer.current) {
       observer.current.disconnect()
       observer.current = null
     }
     
-    // 4. Fetch with fresh filters
     fetchItineraries(true)
   }
   
   const handleResetFilters = () => {
-    // 1. Create new empty filters object
     const newFilters = { query: '', vendorName: '', status: '' as const, date: '' }
-    
-    // 2. Update BOTH state AND ref immediately
     setFilters(newFilters)
-    filtersRef.current = newFilters  // ✅ Critical: sync ref before fetch
+    filtersRef.current = newFilters
     
-    // 3. Reset pagination
     fetchLock.current = false
     currentPageRef.current = 1
     hasMoreRef.current = true
     setPage(1)
     setHasMore(true)
     
-    // 4. Disconnect observer
     if (observer.current) {
       observer.current.disconnect()
       observer.current = null
     }
     
-    // 5. Fetch with clean filters
     fetchItineraries(true)
   }
 
-  // Add refs to track latest filter values
-  const filtersRef = useRef(filters)
-
-  // Keep ref in sync with state
   useEffect(() => {
-    filtersRef.current = filters
-  }, [filters])
-
-  useEffect(() => {
+    fetchItineraries(true)
+    
     return () => {
       if (observer.current) {
         observer.current.disconnect()
@@ -200,7 +186,6 @@ export default function Itineraries() {
     }
   }, [])
 
-  // Handle file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !vendorName || !clientName) {
@@ -244,7 +229,6 @@ export default function Itineraries() {
     }
   }
 
-  // Update itinerary
   const handleUpdateItinerary = async () => {
     if (!selectedItinerary) return
     try {
@@ -264,7 +248,6 @@ export default function Itineraries() {
     }
   }
 
-  // Delete itinerary
   const handleDeleteItinerary = async (id: string) => {
     if (!window.confirm('Are you sure?')) return
     try {
@@ -281,7 +264,76 @@ export default function Itineraries() {
     }
   }
 
-  // Export to PDF
+  const handleConvertToBooking = async () => {
+    if (!convertingItinerary) return;
+    
+    try {
+      toast.loading('Converting to booking...');
+      
+      const payload: ConvertToBookingRequest = {
+        itineraryId: convertingItinerary.id,
+        sellingPrice: parseFloat(bookingForm.sellingPrice) || 0,
+        vendorCost: parseFloat(bookingForm.vendorCost) || 0,
+        phone: bookingForm.phone,
+        whatsapp: bookingForm.whatsapp,
+        travelDate: bookingForm.travelDate,
+        guests: parseInt(bookingForm.guests) || 1,
+        notes: bookingForm.notes
+      };
+      
+      const response = await axios.post<ConvertToBookingResponse | ApiErrorResponse>(
+        '/api/bookings/convert',
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if ('success' in response.data && response.data.success) {
+        toast.dismiss();
+        toast.success('✅ Converted to booking!');
+        setShowConvertModal(false);
+        setConvertingItinerary(null);
+        setBookingForm({
+          sellingPrice: '', vendorCost: '', phone: '', whatsapp: '',
+          travelDate: '', guests: '1', notes: ''
+        });
+        await fetchItineraries(true);
+      } else {
+        const errorData = response.data as ApiErrorResponse;
+        toast.dismiss();
+        toast.error(errorData.error || 'Conversion failed');
+      }
+    } catch (error: any) {
+      toast.dismiss();
+      toast.error(error.response?.data?.error || 'Conversion failed');
+    }
+  };
+
+  const handleRevertToPublished = async (itinerary: Itinerary) => {
+    if (!window.confirm('Restore this itinerary to "Published" status? All payment records will be deleted.')) return;
+    
+    try {
+      toast.loading('Restoring itinerary...');
+      
+      const response = await axios.post(
+        `/api/bookings/${itinerary.id}/revert`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.success) {
+        toast.dismiss();
+        toast.success('✅ Restored to Published');
+        await fetchItineraries(true);
+      } else {
+        toast.dismiss();
+        toast.error(response.data.error || 'Revert failed');
+      }
+    } catch (error: any) {
+      toast.dismiss();
+      toast.error(error.response?.data?.error || 'Revert failed');
+    }
+  };
+
   const handleExportPDF = async (id: string) => {
     try {
       toast.loading('Generating PDF...')
@@ -327,7 +379,6 @@ export default function Itineraries() {
   return (
     <div className="p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-4xl font-bold text-gray-900">Itineraries</h1>
           <button
@@ -339,7 +390,6 @@ export default function Itineraries() {
           </button>
         </div>
 
-        {/* Search & Filters */}
         <div className="bg-white p-4 rounded-lg border border-gray-200 mb-6 shadow-sm">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[200px]">
@@ -366,12 +416,13 @@ export default function Itineraries() {
               <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
               <select
                 value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value as '' | 'Draft' | 'Published' })}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value as '' | 'Draft' | 'Published' | 'Converted' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
               >
                 <option value="">All</option>
                 <option value="Draft">Draft</option>
                 <option value="Published">Published</option>
+                <option value="Converted">Converted</option>
               </select>
             </div>
             <div className="w-40">
@@ -388,19 +439,18 @@ export default function Itineraries() {
                 onClick={handleApplyFilters}
                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
               >
-                Search
+                <Search size={16} /> Search
               </button>
               <button
                 onClick={handleResetFilters}
                 className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
               >
-                Reset
+                <RefreshCw size={16} /> Reset
               </button>
             </div>
           </div>
         </div>
 
-        {/* Itineraries List */}
         <div className="grid gap-4">
           {loading && itineraries.length === 0 ? (
             <p className="text-center text-gray-500 py-8">Loading itineraries...</p>
@@ -410,7 +460,6 @@ export default function Itineraries() {
             itineraries.map((itinerary, index) => (
               <div
                 key={itinerary.id}
-                // Only attach ref to the LAST item, and only if we have more to load
                 ref={index === itineraries.length - 1 && hasMore ? lastItineraryRef : null}
                 className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition"
               >
@@ -422,54 +471,78 @@ export default function Itineraries() {
                       {new Date(itinerary.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      itinerary.status === 'Published'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-yellow-100 text-yellow-700'
-                    }`}
-                  >
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    itinerary.status === 'Published' 
+                      ? 'bg-green-100 text-green-700' 
+                      : itinerary.status === 'Converted'
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'bg-yellow-100 text-yellow-700'
+                  }`}>
                     {itinerary.status}
                   </span>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     onClick={() => {
-                      setSelectedItinerary(itinerary)
-                      setEditContent(itinerary.content)
-                      setSourceContent(itinerary.source_content)
-                      setShowEditor(true)
+                      setSelectedItinerary(itinerary);
+                      setEditContent(itinerary.content);
+                      setSourceContent(itinerary.source_content);
+                      setShowEditor(true);
                     }}
-                    className="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition"
+                    className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition"
                   >
                     <Edit2 size={16} /> Edit
                   </button>
-                  <button
-                    onClick={() => handleExportPDF(itinerary.id)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-green-50 text-green-600 py-2 rounded-lg hover:bg-green-100 transition"
-                  >
-                    <Download size={16} /> Export PDF
-                  </button>
-                  <button
-                    onClick={() => handleDeleteItinerary(itinerary.id)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition"
-                  >
-                    <Trash2 size={16} /> Delete
-                  </button>
+
+                  {itinerary.status !== 'Converted' && (
+                    <button
+                      onClick={() => handleExportPDF(itinerary.id)}
+                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-green-50 text-green-600 py-2 rounded-lg hover:bg-green-100 transition"
+                    >
+                      <Download size={16} /> Export
+                    </button>
+                  )}
+
+                  {itinerary.status === 'Published' && (
+                    <button
+                      onClick={() => {
+                        setConvertingItinerary(itinerary);
+                        setShowConvertModal(true);
+                      }}
+                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-purple-50 text-purple-600 py-2 rounded-lg hover:bg-purple-100 transition font-medium"
+                    >
+                      <Shuffle size={16} /> Convert
+                    </button>
+                  )}
+
+                  {itinerary.status === 'Converted' && (
+                    <button
+                      onClick={() => handleRevertToPublished(itinerary)}
+                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-amber-50 text-amber-600 py-2 rounded-lg hover:bg-amber-100 transition font-medium"
+                      title="Restore to Published"
+                    >
+                      <Undo2 size={16} /> Restore
+                    </button>
+                  )}
+
+                  {itinerary.status !== 'Converted' && (
+                    <button
+                      onClick={() => handleDeleteItinerary(itinerary.id)}
+                      className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition"
+                    >
+                      <Trash2 size={16} /> Delete
+                    </button>
+                  )}
                 </div>
               </div>
             ))
           )}
 
-          {/* Loading indicator */}
           {loadingMore && (
-            <div className="text-center py-4 text-gray-500">
-              Loading more...
-            </div>
+            <div className="text-center py-4 text-gray-500">Loading more...</div>
           )}
 
-          {/* End of list indicator */}
           {!hasMore && itineraries.length > 0 && (
             <div className="text-center py-4 text-sm text-gray-400">
               ✓ All itineraries loaded
@@ -478,7 +551,6 @@ export default function Itineraries() {
         </div>
       </div>
 
-      {/* Upload Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
@@ -528,7 +600,6 @@ export default function Itineraries() {
         </div>
       )}
 
-      {/* Editor Modal */}
       {showEditor && selectedItinerary && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg max-w-4xl w-full h-[90vh] mx-4 flex flex-col">
@@ -570,6 +641,122 @@ export default function Itineraries() {
                 className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition font-medium flex items-center justify-center gap-2"
               >
                 <Download size={18} /> Export PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConvertModal && convertingItinerary && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b">
+              <div>
+                <h2 className="text-xl font-bold">Convert to Booking</h2>
+                <p className="text-sm text-gray-500">{convertingItinerary.client_name} • {convertingItinerary.vendor_name}</p>
+              </div>
+              <button onClick={() => setShowConvertModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Selling Price (₹)</label>
+                  <input
+                    type="number"
+                    value={bookingForm.sellingPrice}
+                    onChange={(e) => setBookingForm({...bookingForm, sellingPrice: e.target.value})}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Vendor Cost (₹)</label>
+                  <input
+                    type="number"
+                    value={bookingForm.vendorCost}
+                    onChange={(e) => setBookingForm({...bookingForm, vendorCost: e.target.value})}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={bookingForm.phone}
+                    onChange={(e) => setBookingForm({...bookingForm, phone: e.target.value})}
+                    placeholder="+91 XXXXX XXXXX"
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">WhatsApp</label>
+                  <input
+                    type="tel"
+                    value={bookingForm.whatsapp}
+                    onChange={(e) => setBookingForm({...bookingForm, whatsapp: e.target.value})}
+                    placeholder="+91 XXXXX XXXXX"
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Travel Date</label>
+                  <input
+                    type="date"
+                    value={bookingForm.travelDate}
+                    onChange={(e) => setBookingForm({...bookingForm, travelDate: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Guests</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={bookingForm.guests}
+                    onChange={(e) => setBookingForm({...bookingForm, guests: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Notes</label>
+                <textarea
+                  value={bookingForm.notes}
+                  onChange={(e) => setBookingForm({...bookingForm, notes: e.target.value})}
+                  placeholder="Special requests, preferences, etc."
+                  rows={3}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg text-sm">
+                <p><strong>Booking ID:</strong> <span className="text-purple-600">JG-XXXX (auto-generated)</span></p>
+                <p><strong>Client Balance Due:</strong> ₹{bookingForm.sellingPrice ? parseFloat(bookingForm.sellingPrice).toLocaleString() : '0'}</p>
+                <p><strong>Vendor Balance Due:</strong> ₹{bookingForm.vendorCost ? parseFloat(bookingForm.vendorCost).toLocaleString() : '0'}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-6 border-t bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => setShowConvertModal(false)}
+                className="flex-1 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConvertToBooking}
+                disabled={!bookingForm.sellingPrice || !bookingForm.vendorCost}
+                className="flex-1 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                <Shuffle size={18} /> Confirm Conversion
               </button>
             </div>
           </div>
