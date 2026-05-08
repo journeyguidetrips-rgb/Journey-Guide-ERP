@@ -1,8 +1,6 @@
 // src/services/bookingService.ts
 import { pool } from '../database/connection'
-import { Router, Request, Response } from 'express';
 
-const router = Router();
 interface ConvertToBookingData {
   itineraryId: string;
   sellingPrice: number;

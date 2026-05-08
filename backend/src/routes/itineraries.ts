@@ -4,7 +4,6 @@ import path from 'path';
 import fs from 'fs/promises'; // Added to read the file content
 import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from '../middleware/authMiddleware';
-import { marked } from 'marked';
 import puppeteer from 'puppeteer';
 import {
   createItinerary,
@@ -14,9 +13,6 @@ import {
   publishItinerary,
   deleteItinerary,
 } from '../services/itineraryService';
-import {
-  markdownToHtml,
-} from '../services/fileProcessingService';
 
 const router = express.Router();
 

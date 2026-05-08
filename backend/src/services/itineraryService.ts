@@ -1,11 +1,17 @@
-import { Pool } from 'pg';
+import { pool } from '../database/connection'
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
-// Configure your DB connection (adjust env vars as needed)
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+// Get all itineraries for a user
+interface GetItinerariesFilters {
+  userId: number;
+  page?: number;
+  limit?: number;
+  search?: string;
+  vendor?: string;
+  status?: 'Draft' | 'Published';
+  date?: string;
+}
 
 // Configure this for conversion of md to html
 const execAsync = promisify(exec);
@@ -77,17 +83,6 @@ export const deleteItinerary = async (id: string) => {
   );
   return result.rowCount > 0;
 };
-
-// Get all itineraries for a user
-interface GetItinerariesFilters {
-  userId: number;
-  page?: number;
-  limit?: number;
-  search?: string;
-  vendor?: string;
-  status?: 'Draft' | 'Published';
-  date?: string;
-}
 
 export const getUserItineraries = async ({
   userId,

@@ -217,7 +217,7 @@ export default function Finance() {
 
   // ================= API CALLS =================
   const api = useMemo(() => axios.create({
-    baseURL: import.meta.env.DEV ? 'http://localhost:5000/api' : '/api',
+    baseURL: '/api',
     headers: { 'Content-Type': 'application/json' },
   }), [])
 
@@ -360,7 +360,7 @@ export default function Finance() {
     })
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
     const link = document.createElement('a')
-    link.href = `text/csv;charset=utf-8,${encodeURIComponent(csv)}`
+    link.href = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`
     link.download = `payments_${type}_${new Date().toISOString().split('T')[0]}.csv`
     link.click()
     toast.success('Report exported')

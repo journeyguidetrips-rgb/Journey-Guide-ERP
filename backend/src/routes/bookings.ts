@@ -1,5 +1,4 @@
 // src/routes/bookings.ts
-import { Console } from 'console';
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/authMiddleware';
 import { 
@@ -9,6 +8,7 @@ import {
   addClientPayment,
   addVendorPayment,
   getBookings,
+  getBookingDetails,
   getClientPayments,
   getVendorPayments,
   getDashboardSummary

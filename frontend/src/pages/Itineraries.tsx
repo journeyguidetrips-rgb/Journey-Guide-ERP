@@ -8,7 +8,7 @@ import {
   ConvertToBookingRequest,
   ConvertToBookingResponse,
   ApiErrorResponse,
-} from '../../../backend/src/types/booking'
+} from '../types/booking'
 
 interface SearchFilters {
   query: string;

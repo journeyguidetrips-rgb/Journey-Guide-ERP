@@ -1,4 +1,9 @@
 import express, { Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
+import { 
+  authenticate, 
+  isAdmin 
+} from '../middleware/authMiddleware';
 import {
   registerUser,
   loginUser,
@@ -7,12 +12,19 @@ import {
   updateUserRole,
   deactivateUser,
 } from '../services/authService';
-import { authenticate, isAdmin } from '../middleware/authMiddleware';
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,                   // max 10 attempts per window per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please try again after 15 minutes.' },
+});
 
 const router = express.Router();
 
 // Register new user
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', authLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password, firstName, lastName, roleId } = req.body;
 
@@ -37,7 +49,7 @@ router.post('/register', async (req: Request, res: Response) => {
 });
 
 // Login user
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', authLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 

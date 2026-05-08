@@ -3,20 +3,17 @@ import jwt from 'jsonwebtoken';
 import { pool } from '../database/connection';
 import { User, UserWithRole, JWTPayload } from '../types/user';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is not set. Server cannot start without it.');
+}
+
 const JWT_EXPIRY = '24h';
 
 // Hash password
 export const hashPassword = async (password: string): Promise<string> => {
-  console.log('🔐 Hashing password...');
-  try {
-    const hashed = await bcrypt.hash(password, 10);
-    console.log('✅ Password hashed successfully');
-    return hashed;
-  } catch (error: any) {
-    console.error('❌ Password hashing failed:', error.message);
-    throw error;
-  }
+  return bcrypt.hash(password, 10);
 };
 
 // Compare password
@@ -40,7 +37,6 @@ export const verifyToken = (token: string): JWTPayload | null => {
 
 // Get user with permissions
 export const getUserWithPermissions = async (userId: number): Promise<UserWithRole | null> => {
-  console.log(`📋 Fetching user #${userId} with permissions...`);
   try {
     const query = `
       SELECT 
@@ -54,20 +50,10 @@ export const getUserWithPermissions = async (userId: number): Promise<UserWithRo
       WHERE u.id = $1
       GROUP BY u.id, r.name
     `;
-    
-    console.log('   Executing query...');
     const result = await pool.query(query, [userId]);
-    
-    if (result.rows.length === 0) {
-      console.error(`��� User #${userId} not found`);
-      return null;
-    }
-    
-    console.log(`✅ User fetched: ${result.rows[0].email}`);
-    return result.rows[0];
+    return result.rows[0] ?? null;
   } catch (error: any) {
-    console.error('❌ Error fetching user with permissions:', error.message);
-    console.error('   Stack:', error.stack);
+    console.error('getUserWithPermissions error:', error.message);
     return null;
   }
 };
@@ -80,88 +66,39 @@ export const registerUser = async (
   lastName: string,
   roleId: number = 3
 ): Promise<User | null> => {
-  console.log('\n========== USER REGISTRATION ==========');
-  console.log(`📧 Email: ${email}`);
-  console.log(`👤 Name: ${firstName} ${lastName}`);
-  console.log(`👥 Role ID: ${roleId}`);
-
   try {
-    // Step 1: Validate inputs
-    console.log('\n[STEP 1] Validating inputs...');
     if (!email || !password || !firstName || !lastName) {
-      console.error('❌ Missing required fields');
       return null;
     }
-    console.log('✅ All inputs provided');
 
-    // Step 2: Check if email already exists
-    console.log('\n[STEP 2] Checking if email already exists...');
-    const checkQuery = 'SELECT id FROM users WHERE email = $1';
-    const checkResult = await pool.query(checkQuery, [email]);
-    
+    const checkResult = await pool.query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
     if (checkResult.rows.length > 0) {
-      console.error(`��� Email already exists (User ID: ${checkResult.rows[0].id})`);
-      return null;
+      return null; // Email already exists
     }
-    console.log('✅ Email is unique');
 
-    // Step 3: Verify role exists
-    console.log('\n[STEP 3] Verifying role exists...');
-    const roleQuery = 'SELECT id FROM roles WHERE id = $1';
-    const roleResult = await pool.query(roleQuery, [roleId]);
-    
+    const roleResult = await pool.query(
+      'SELECT id FROM roles WHERE id = $1',
+      [roleId]
+    );
     if (roleResult.rows.length === 0) {
-      console.error(`❌ Role ID ${roleId} does not exist`);
-      console.log('   Available roles:');
-      const allRoles = await pool.query('SELECT id, name FROM roles');
-      allRoles.rows.forEach(r => console.log(`   - Role ${r.id}: ${r.name}`));
-      return null;
-    }
-    console.log(`✅ Role exists: ${roleResult.rows[0].id}`);
-
-    // Step 4: Hash password
-    console.log('\n[STEP 4] Hashing password...');
-    const hashedPassword = await hashPassword(password);
-    console.log('✅ Password hashed');
-
-    // Step 5: Insert user into database
-    console.log('\n[STEP 5] Inserting user into database...');
-    const insertQuery = `
-      INSERT INTO users (email, password, first_name, last_name, role_id, is_active)
-      VALUES ($1, $2, $3, $4, $5, true)
-      RETURNING id, email, first_name, last_name, role_id, is_active, created_at
-    `;
-    
-    console.log('   Query:', insertQuery);
-    console.log('   Parameters: [$1=email, $2=hashed_password, $3=firstName, $4=lastName, $5=roleId]');
-    
-    const insertResult = await pool.query(insertQuery, [
-      email,
-      hashedPassword,
-      firstName,
-      lastName,
-      roleId,
-    ]);
-
-    if (insertResult.rows.length === 0) {
-      console.error('❌ Insert query returned no rows');
-      return null;
+      return null; // Role does not exist
     }
 
-    console.log('✅ User inserted successfully');
-    console.log(`   User ID: ${insertResult.rows[0].id}`);
-    console.log(`   Email: ${insertResult.rows[0].email}`);
-    console.log('========== REGISTRATION COMPLETE ==========\n');
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    return insertResult.rows[0];
+    const insertResult = await pool.query(
+      `INSERT INTO users (email, password, first_name, last_name, role_id, is_active)
+       VALUES ($1, $2, $3, $4, $5, true)
+       RETURNING id, email, first_name, last_name, role_id, is_active, created_at`,
+      [email, hashedPassword, firstName, lastName, roleId]
+    );
 
+    return insertResult.rows[0] ?? null;
   } catch (error: any) {
-    console.error('\n❌ REGISTRATION FAILED');
-    console.error('   Error Message:', error.message);
-    console.error('   Error Code:', error.code);
-    console.error('   Error Detail:', error.detail);
-    console.error('   Error Stack:', error.stack);
-    console.error('========== REGISTRATION COMPLETE ==========\n');
+    console.error('registerUser error:', error.message);
     return null;
   }
 };
