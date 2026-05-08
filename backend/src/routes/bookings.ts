@@ -1,4 +1,5 @@
 // src/routes/bookings.ts
+import { Console } from 'console';
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/authMiddleware';
 import { 
@@ -7,7 +8,10 @@ import {
   getBookingWithPayments,
   addClientPayment,
   addVendorPayment,
-  getBookings
+  getBookings,
+  getClientPayments,
+  getVendorPayments,
+  getDashboardSummary
 } from '../services/bookingService';
 import { 
   ConvertToBookingRequest,
@@ -22,6 +26,107 @@ import {
 } from '../types/booking';
 
 const router = Router();
+
+// ✅ GET /api/bookings/client-payments - List all client payments
+router.get('/client-payments', authenticate, async (req: Request, res: Response) => {
+  try {
+    const {
+      page,
+      limit,
+      search,
+      bookingId,
+      paymentType,
+      paymentMode,
+      startDate,
+      endDate,
+    } = req.query;
+
+    console.log("In 'Get Payments' method");
+
+    const result = await getClientPayments({
+      userId: req.user!.id,
+      page: page ? parseInt(page as string) : 1,
+      limit: limit ? parseInt(limit as string) : 20,
+      search: search as string,
+      bookingId: bookingId as string,
+      paymentType: paymentType as 'Advance' | 'Final' | 'Refund' | 'Other',
+      paymentMode: paymentMode as 'UPI' | 'Bank Transfer' | 'Cash' | 'Card' | 'Cheque',
+      startDate: startDate as string,
+      endDate: endDate as string,
+    });
+
+    res.json({
+      success: true,
+      payments: result.payments,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      hasMore: result.hasMore,
+    });
+  } catch (error: any) {
+    console.error('Get client payments error:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch client payments' });
+  }
+});
+
+// ✅ GET /api/bookings/vendor-payments - List all vendor payments
+router.get('/vendor-payments', authenticate, async (req: Request, res: Response) => {
+  try {
+    const {
+      page,
+      limit,
+      search,
+      bookingId,
+      vendorName,
+      paymentMode,
+      startDate,
+      endDate,
+    } = req.query;
+
+    const result = await getVendorPayments({
+      userId: req.user!.id,
+      page: page ? parseInt(page as string) : 1,
+      limit: limit ? parseInt(limit as string) : 20,
+      search: search as string,
+      bookingId: bookingId as string,
+      vendorName: vendorName as string,
+      paymentMode: paymentMode as 'UPI' | 'Bank Transfer' | 'Cash' | 'Card' | 'Cheque',
+      startDate: startDate as string,
+      endDate: endDate as string,
+    });
+
+    res.json({
+      success: true,
+      payments: result.payments,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      hasMore: result.hasMore,
+    });
+  } catch (error: any) {
+    console.error('Get vendor payments error:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch vendor payments' });
+  }
+});
+
+// src/routes/bookings.ts
+router.get('/dashboard-summary', authenticate, async (req, res) => {
+  try {
+    const data = await getDashboardSummary();
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch dashboard summary' });
+  }
+});
+
+router.get('/:bookingId/details', authenticate, async (req, res) => {
+  try {
+    const data = await getBookingDetails(req.params.bookingId);
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(404).json({ error: 'Booking not found' });
+  }
+});
 
 router.post<
   {},

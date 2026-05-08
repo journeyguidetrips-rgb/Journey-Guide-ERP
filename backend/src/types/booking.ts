@@ -173,15 +173,3 @@ export interface ConvertToBookingRequest {
     vendorBalanceDue: number;
   }
 
-  interface GetBookingsFilters {
-    userId: number;
-    page?: number;
-    limit?: number;
-    search?: string;        // client_name search
-    vendor?: string;        // vendor_name search
-    status?: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
-    travelDate?: string;    // YYYY-MM-DD
-    bookingDate?: string;   // YYYY-MM-DD
-    minSellingPrice?: number;
-    maxSellingPrice?: number;
-  }

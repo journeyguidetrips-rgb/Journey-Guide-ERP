@@ -1,6 +1,6 @@
 // src/db.ts
-import { Pool } from 'pg';
 import dotenv from 'dotenv';
+import { Pool } from 'pg';
 
 dotenv.config();
 
@@ -14,6 +14,7 @@ export const pool = new Pool({
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
   connectionTimeoutMillis: 2000, // Return error after 2 seconds if connection fails
+  ssl: { rejectUnauthorized: false }
 });
 
 // Test the connection on startup

@@ -1,5 +1,5 @@
 // src/services/bookingService.ts
-import { pool } from '../database/config'
+import { pool } from '../database/connection'
 import { Router, Request, Response } from 'express';
 
 const router = Router();
@@ -27,7 +27,42 @@ interface GetBookingsFilters {
   maxSellingPrice?: number;
 }
 
-const generateBookingId = async (): Promise<string> => {
+interface GetVendorPaymentsFilters {
+  userId: number;
+  page?: number;
+  limit?: number;
+  search?: string;        // client_name, vendor_name, or booking_id search
+  bookingId?: string;
+  vendorName?: string;
+  paymentMode?: 'UPI' | 'Bank Transfer' | 'Cash' | 'Card' | 'Cheque';
+  startDate?: string;
+  endDate?: string;
+}
+
+interface GetClientPaymentsFilters {
+  userId: number;
+  page?: number;
+  limit?: number;
+  search?: string;        // client_name or booking_id search
+  bookingId?: string;
+  paymentType?: 'Advance' | 'Final' | 'Refund' | 'Other';
+  paymentMode?: 'UPI' | 'Bank Transfer' | 'Cash' | 'Card' | 'Cheque';
+  startDate?: string;     // YYYY-MM-DD
+  endDate?: string;       // YYYY-MM-DD
+}
+
+export const getDashboardSummary = async () => {
+  const result = await pool.query('SELECT * FROM get_dashboard_summary()');
+  return result.rows[0];
+};
+
+export const getBookingDetails = async (bookingId: string) => {
+  const result = await pool.query('SELECT * FROM get_booking_details($1)', [bookingId]);
+  if (result.rows.length === 0) throw new Error('Booking not found');
+  return result.rows[0];
+};
+
+export const generateBookingId = async (): Promise<string> => {
   const result = await pool.query(
     `SELECT COUNT(*) as count FROM bookings`
   );
@@ -161,8 +196,23 @@ export const revertBookingToItinerary = async (
 };
 
 export const getBookingWithPayments = async (bookingId: string) => {
-  const [bookingResult, clientPaymentsResult, vendorPaymentsResult] = await Promise.all([
+  // Fetch booking + aggregated payment totals in parallel
+  const [bookingResult, clientAggResult, vendorAggResult, clientPaymentsResult, vendorPaymentsResult] = await Promise.all([
     pool.query(`SELECT * FROM bookings WHERE booking_id = $1`, [bookingId]),
+    
+    // ✅ Aggregate client payments SUM
+    pool.query(
+      `SELECT COALESCE(SUM(amount), 0) as total_received FROM client_payments WHERE booking_id = $1`,
+      [bookingId]
+    ),
+    
+    // ✅ Aggregate vendor payments SUM
+    pool.query(
+      `SELECT COALESCE(SUM(amount_paid), 0) as total_paid FROM vendor_payments WHERE booking_id = $1`,
+      [bookingId]
+    ),
+    
+    // Fetch payment history for UI display
     pool.query(
       `SELECT * FROM client_payments WHERE booking_id = $1 ORDER BY payment_date DESC, created_at DESC`,
       [bookingId]
@@ -178,12 +228,21 @@ export const getBookingWithPayments = async (bookingId: string) => {
     throw new Error('Booking not found');
   }
 
-  const clientBalanceDue = (booking.selling_price || 0) - (booking.received_from_client || 0);
-  const vendorBalanceDue = (booking.vendor_cost || 0) - (booking.paid_to_vendor || 0);
+  // ✅ Use aggregated totals instead of empty columns
+  const totalReceived = parseFloat(clientAggResult.rows[0].total_received) || 0;
+  const totalPaid = parseFloat(vendorAggResult.rows[0].total_paid) || 0;
+  
+  const clientBalanceDue = (parseFloat(booking.selling_price) || 0) - totalReceived;
+  const vendorBalanceDue = (parseFloat(booking.vendor_cost) || 0) - totalPaid;
 
   return {
     success: true,
-    booking,
+    booking: {
+      ...booking,
+      // ✅ Override with calculated totals so frontend gets correct values
+      received_from_client: totalReceived,
+      paid_to_vendor: totalPaid,
+    },
     clientPayments: clientPaymentsResult.rows,
     vendorPayments: vendorPaymentsResult.rows,
     clientBalanceDue,
@@ -368,7 +427,6 @@ export const getBookings = async ({
   const offset = (page - 1) * limit;
 
   // 1️⃣ Build WHERE conditions & filter values
-  // Bookings link to users via itineraries table
   const conditions: string[] = ['i.user_id = $1'];
   const filterValues: any[] = [userId];
   let paramIndex = 2;
@@ -411,11 +469,32 @@ export const getBookings = async ({
 
   const whereClause = conditions.join(' AND ');
 
-  // 2️⃣ Data Query (JOIN with itineraries to filter by user)
+  // 2️⃣ Data Query with aggregated payment totals
+  // ✅ LEFT JOIN client_payments to calculate received_from_client
+  // ✅ LEFT JOIN vendor_payments to calculate paid_to_vendor
   const dataQuery = `
-    SELECT b.*, i.client_name as itinerary_client, i.vendor_name as itinerary_vendor
+    SELECT 
+      b.*,
+      i.client_name as itinerary_client,
+      i.vendor_name as itinerary_vendor,
+      -- ✅ Calculate real received_from_client from payment logs
+      COALESCE(cp_agg.total_received, 0) as calculated_received,
+      -- ✅ Calculate real paid_to_vendor from payment logs
+      COALESCE(vp_agg.total_paid, 0) as calculated_paid
     FROM bookings b
     INNER JOIN itineraries i ON b.itinerary_id = i.id
+    -- Aggregate client payments per booking
+    LEFT JOIN (
+      SELECT booking_id, SUM(amount) as total_received
+      FROM client_payments
+      GROUP BY booking_id
+    ) cp_agg ON b.booking_id = cp_agg.booking_id
+    -- Aggregate vendor payments per booking
+    LEFT JOIN (
+      SELECT booking_id, SUM(amount_paid) as total_paid
+      FROM vendor_payments
+      GROUP BY booking_id
+    ) vp_agg ON b.booking_id = vp_agg.booking_id
     WHERE ${whereClause}
     ORDER BY b.created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -433,8 +512,190 @@ export const getBookings = async ({
   const countResult = await pool.query(countQuery, filterValues);
   const total = parseInt(countResult.rows[0].count, 10);
 
+  // ✅ Override empty columns with calculated totals
+  const bookingsWithCalculatedTotals = dataResult.rows.map(booking => ({
+    ...booking,
+    received_from_client: parseFloat(booking.calculated_received) || 0,
+    paid_to_vendor: parseFloat(booking.calculated_paid) || 0,
+    // Remove helper columns so frontend doesn't see them
+  }));
+
   return {
-    bookings: dataResult.rows,
+    bookings: bookingsWithCalculatedTotals,
+    total,
+    page,
+    limit,
+    hasMore: offset + dataResult.rows.length < total,
+  };
+};
+
+export const getClientPayments = async ({
+  userId,
+  page = 1,
+  limit = 20,
+  search,
+  bookingId,
+  paymentType,
+  paymentMode,
+  startDate,
+  endDate,
+}: GetClientPaymentsFilters) => {
+  const offset = (page - 1) * limit;
+
+  // Build WHERE clause - join bookings to filter by user
+  const conditions: string[] = [];
+  const filterValues: any[] = [userId];
+  let paramIndex = 1;
+
+  if (search) {
+    conditions.push(`(cp.client_name ILIKE $${paramIndex} OR cp.booking_id ILIKE $${paramIndex})`);
+    filterValues.push(`%${search}%`);
+    paramIndex++;
+  }
+  if (bookingId) {
+    conditions.push(`cp.booking_id = $${paramIndex}`);
+    filterValues.push(bookingId);
+    paramIndex++;
+  }
+  if (paymentType) {
+    conditions.push(`cp.payment_type = $${paramIndex}`);
+    filterValues.push(paymentType);
+    paramIndex++;
+  }
+  if (paymentMode) {
+    conditions.push(`cp.payment_mode = $${paramIndex}`);
+    filterValues.push(paymentMode);
+    paramIndex++;
+  }
+  if (startDate) {
+    conditions.push(`cp.payment_date >= $${paramIndex}`);
+    filterValues.push(startDate);
+    paramIndex++;
+  }
+  if (endDate) {
+    conditions.push(`cp.payment_date <= $${paramIndex}`);
+    filterValues.push(endDate);
+    paramIndex++;
+  }
+
+  const whereClause = conditions.length ? 'WHERE ' +  conditions.join(' AND ') : '';
+
+  // Data query with JOIN to get booking details
+  const dataQuery = `
+    SELECT 
+      cp.*,
+      b.client_name as booking_client,
+      b.vendor_name as booking_vendor,
+      b.package_name as booking_package
+    FROM client_payments cp
+    INNER JOIN bookings b ON cp.booking_id = b.booking_id
+    INNER JOIN itineraries i ON b.itinerary_id = i.id
+    ${whereClause}
+    ORDER BY cp.payment_date DESC, cp.created_at DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+
+  const dataValues = conditions.length ? [...filterValues, limit, offset] : [limit, offset];
+  const dataResult = await pool.query(dataQuery, dataValues);
+
+  // Count query
+  const countQuery = `
+    SELECT COUNT(*) 
+    FROM client_payments cp
+    INNER JOIN bookings b ON cp.booking_id = b.booking_id
+    INNER JOIN itineraries i ON b.itinerary_id = i.id
+    ${whereClause}
+  `;
+  const countResult = conditions.length ? await pool.query(countQuery, filterValues) : await pool.query(countQuery);
+  const total = parseInt(countResult.rows[0].count, 10);  
+
+  return {
+    payments: dataResult.rows,
+    total,
+    page,
+    limit,
+    hasMore: offset + dataResult.rows.length < total,
+  };
+};
+
+export const getVendorPayments = async ({
+  userId,
+  page = 1,
+  limit = 20,
+  search,
+  bookingId,
+  vendorName,
+  paymentMode,
+  startDate,
+  endDate,
+}: GetVendorPaymentsFilters) => {
+  const offset = (page - 1) * limit;
+
+  const conditions: string[] = [];
+  const filterValues: any[] = [userId];
+  let paramIndex = 1;
+
+  if (search) {
+    conditions.push(`(vp.client_name ILIKE $${paramIndex} OR vp.vendor_name ILIKE $${paramIndex} OR vp.booking_id ILIKE $${paramIndex})`);
+    filterValues.push(`%${search}%`);
+    paramIndex++;
+  }
+  if (bookingId) {
+    conditions.push(`vp.booking_id = $${paramIndex}`);
+    filterValues.push(bookingId);
+    paramIndex++;
+  }
+  if (vendorName) {
+    conditions.push(`vp.vendor_name ILIKE $${paramIndex}`);
+    filterValues.push(`%${vendorName}%`);
+    paramIndex++;
+  }
+  if (paymentMode) {
+    conditions.push(`vp.payment_mode = $${paramIndex}`);
+    filterValues.push(paymentMode);
+    paramIndex++;
+  }
+  if (startDate) {
+    conditions.push(`vp.date_paid >= $${paramIndex}`);
+    filterValues.push(startDate);
+    paramIndex++;
+  }
+  if (endDate) {
+    conditions.push(`vp.date_paid <= $${paramIndex}`);
+    filterValues.push(endDate);
+    paramIndex++;
+  }
+
+  const whereClause = conditions.length ? 'WHERE ' +  conditions.join(' AND ') : '';
+
+  const dataQuery = `
+    SELECT 
+      vp.*,
+      b.client_name as booking_client,
+      b.package_name as booking_package
+    FROM vendor_payments vp
+    INNER JOIN bookings b ON vp.booking_id = b.booking_id
+    INNER JOIN itineraries i ON b.itinerary_id = i.id
+    ${whereClause}
+    ORDER BY vp.date_paid DESC, vp.created_at DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+
+  const dataValues = conditions.length ? [...filterValues, limit, offset] : [limit, offset];
+  const dataResult = await pool.query(dataQuery, dataValues);
+
+  const countQuery = `
+    SELECT COUNT(*) 
+    FROM vendor_payments vp
+    INNER JOIN bookings b ON vp.booking_id = b.booking_id
+    INNER JOIN itineraries i ON b.itinerary_id = i.id
+    ${whereClause}
+  `;
+  const countResult = conditions.length ? await pool.query(countQuery, filterValues) : await pool.query(countQuery);
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  return {
+    payments: dataResult.rows,
     total,
     page,
     limit,

@@ -1,18 +1,31 @@
-import { Pool } from 'pg';
 import dotenv from 'dotenv';
+import { Pool } from 'pg';
 
 dotenv.config();
 
 console.log('📝 PostgreSQL Connection Configuration:');
 console.log('   DATABASE_URL:', process.env.DATABASE_URL ? '✅ SET' : '❌ NOT SET');
 
+interface SSLConfig {
+  rejectUnauthorized?: boolean;
+}
+
 // Create connection pool with explicit configuration
+const isNeon = process.env.DATABASE_URL?.includes('sslmode');
+let sslConfig: SSLConfig | boolean;
+
+if (isNeon) {
+  sslConfig = { rejectUnauthorized: false };
+} else {
+  sslConfig = false;
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: sslConfig,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 20000,
 });
 
 // Log connection attempts
