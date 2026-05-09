@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { Download } from 'lucide-react'
 import { useFinance } from '../hooks/useFinance'
-import { postClientPayment, postVendorPayment } from '../services/bookingService'
+import { postClientPayment, postVendorPayment, downloadPaymentReceipt } from '../services/bookingService'
 import { useUserStore } from '../stores/userStore'
 import { TabView, PaymentForm, VendorPaymentForm, Booking } from '../types/finance'
 import DashboardTab from '../components/finance/DashboardTab'
@@ -80,6 +80,25 @@ export default function Finance() {
     }))
     setShowClientModal(true)
   }, [])
+
+  const handleDownloadReceipt = useCallback(async (paymentId: number, bookingId: string) => {
+    const toastId = toast.loading('Generating receipt PDF...')
+    try {
+      const response = await downloadPaymentReceipt(token!, bookingId, paymentId)
+      const blob = new Blob([response.data as unknown as BlobPart], { type: 'application/pdf' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `receipt-${bookingId}-${paymentId}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('Receipt downloaded!', { id: toastId })
+    } catch {
+      toast.error('Failed to generate receipt', { id: toastId })
+    }
+  }, [token])
 
   const handleAddVendorPayment = useCallback((booking: Booking) => {
     setVendorForm(prev => ({
@@ -246,6 +265,7 @@ export default function Finance() {
             hasMoreRef={hasMoreRef}
             fetchLock={fetchLock}
             onFetchMore={() => loadClientPayments(false)}
+            onDownloadReceipt={handleDownloadReceipt}
           />
         )}
 

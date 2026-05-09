@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { FileDown } from 'lucide-react'
 import { ClientPayment, VendorPayment } from '../../types/finance'
 import { formatCurrency, formatDate, getPaymentTypeStyle } from '../../utils/formatters'
 
@@ -9,6 +10,7 @@ interface PaymentsTabProps {
   hasMoreRef: React.MutableRefObject<boolean>
   fetchLock: React.MutableRefObject<boolean>
   onFetchMore: () => void
+  onDownloadReceipt?: (paymentId: number, bookingId: string) => void
 }
 
 export default function PaymentsTab({
@@ -18,6 +20,7 @@ export default function PaymentsTab({
   hasMoreRef,
   fetchLock,
   onFetchMore,
+  onDownloadReceipt,
 }: PaymentsTabProps) {
   const observer = useRef<IntersectionObserver | null>(null)
 
@@ -29,6 +32,8 @@ export default function PaymentsTab({
     }, { rootMargin: '150px' })
     observer.current.observe(node)
   }, [loading, hasMoreRef, fetchLock, onFetchMore])
+
+  const clientColSpan = isClient ? 9 : 7
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
@@ -43,18 +48,19 @@ export default function PaymentsTab({
             <th className="px-4 py-3">Mode</th>
             <th className="px-4 py-3">UTR / Ref</th>
             <th className="px-4 py-3">Remarks</th>
+            {isClient && <th className="px-4 py-3 text-center">Receipt</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {loading && payments.length === 0 ? (
             <tr>
-              <td colSpan={isClient ? 8 : 7} className="px-4 py-10 text-center text-gray-500">
+              <td colSpan={clientColSpan} className="px-4 py-10 text-center text-gray-500">
                 Loading payments...
               </td>
             </tr>
           ) : payments.length === 0 ? (
             <tr>
-              <td colSpan={isClient ? 8 : 7} className="px-4 py-10 text-center text-gray-500">
+              <td colSpan={clientColSpan} className="px-4 py-10 text-center text-gray-500">
                 No payments recorded yet
               </td>
             </tr>
@@ -90,6 +96,17 @@ export default function PaymentsTab({
                 >
                   {p.remarks || '-'}
                 </td>
+                {isClient && (
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => onDownloadReceipt?.(p.id, p.booking_id)}
+                      title="Download Receipt PDF"
+                      className="inline-flex items-center justify-center p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition"
+                    >
+                      <FileDown size={16} />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))
           )}

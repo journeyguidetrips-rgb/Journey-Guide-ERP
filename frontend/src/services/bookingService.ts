@@ -55,3 +55,13 @@ export const postVendorPayment = (
   api.post(`/bookings/${bookingId}/vendor-payments`, payload, {
     headers: authHeader(token),
   })
+
+export const downloadPaymentReceipt = (
+  token: string,
+  bookingId: string,
+  paymentId: number
+) =>
+  api.get<Blob>(`/bookings/${bookingId}/client-payments/${paymentId}/receipt`, {
+    headers: authHeader(token),
+    responseType: 'blob',
+  })

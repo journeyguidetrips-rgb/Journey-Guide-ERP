@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{title}}</title>
+  {{meta-tags}}
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+
+  <style>
+    :root {
+      --primary: #0D1B4B;
+      --accent: #B8922A;
+      --accent-light: #d4a94e;
+      --bg-primary: #f9f7f4;
+      --bg-accent: #fffdf9;
+      --text: #1c1c2e;
+      --text-light: #7a7a8c;
+      --border: #e6e2da;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .jg-document {
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ──── HEADER ──── */
+    .jg-header {
+      background: var(--primary);
+      color: white;
+      padding: 3rem 5%;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .jg-header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(184, 146, 42, 0.1) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .jg-header-inner {
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+
+    .jg-brand-section {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+
+    .jg-logo {
+      width: 100px;
+      height: 100px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .jg-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border: 3px solid var(--accent-light);
+      border-radius: 12px;
+    }
+
+    .jg-brand {
+      flex: 1;      
+    }
+
+    .jg-brand h1 {
+      font-size: 3.2rem;
+      margin: 0;
+      letter-spacing: 2px;
+      line-height: 1;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      text-transform: uppercase;
+    }
+
+    .jg-brand span {
+      color: var(--accent-light);
+    }
+
+    .jg-brand-rule {
+        width: 75px;
+        height: 1px;
+        background: rgba(184, 146, 42, .4);
+        margin-top: 10px;
+    }
+
+    .jg-brand-subtitle {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--accent-light);
+      margin-top: 0.5rem;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+    }
+
+    .jg-contact-section {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+
+    .jg-contact-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 1.25rem;
+      border-radius: 8px;
+      transition: all 0.3s;
+    }
+
+    .jg-contact-item:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .jg-contact-icon {
+      color: var(--accent);
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .jg-contact-content {
+      flex: 1;
+      padding-top: 0.3rem;
+    }
+
+    .jg-contact-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.7;
+      display: block;
+      margin-bottom: 0.4rem;
+    }
+
+    .jg-contact-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: white;
+    }
+
+    .jg-contact-item a {
+      color: white;
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+
+    .jg-contact-item a:hover {
+      color: var(--accent-light);
+    }
+
+    /* ──── BODY ──── */
+    .jg-body {
+      flex: 1;
+      width: 100%;
+      padding: 3rem 5%;
+      background: white;
+    }
+
+    .jg-body-wrapper {
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .jg-body p {
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+      color: var(--text);
+      line-height: 1.8;
+    }
+
+    .jg-body strong {
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .jg-body a {
+      color: var(--primary);
+      text-decoration: underline;
+      transition: color 0.3s;
+    }
+
+    .jg-body a:hover {
+      color: var(--accent);
+    }
+
+    .jg-body hr {
+      border: none;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+      margin: 2.5rem 0;
+    }
+
+    .jg-body img {
+      max-width: 100%;
+      height: auto;
+      margin: 1.5rem 0;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(13, 27, 75, 0.1);
+    }
+
+    /* HEADINGS */
+    .jg-body h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin: 2.5rem 0 1rem 0;
+      letter-spacing: -0.8px;
+      position: relative;
+      padding-bottom: 1rem;
+      border-bottom: 4px solid var(--accent);
+    }
+
+    .jg-body h1::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 80px;
+      height: 4px;
+      background: var(--primary);
+    }
+
+    .jg-body h2 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin: 2rem 0 0.75rem 0;
+      letter-spacing: -0.5px;
+      padding-bottom: 0.75rem;
+      border-bottom: 2px solid var(--accent);
+    }
+
+    .jg-body h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 1.5rem 0 0.75rem 0;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .jg-day-badge {
+      display: inline-flex;
+      align-items: center;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      padding: 0.65rem 1.3rem;
+      border-radius: 30px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(13, 27, 75, 0.2);
+    }
+
+    .jg-body h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 1.25rem 0 0.6rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .jg-activity-badge {
+      display: inline-flex;
+      align-items: center;
+      background: var(--accent);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 0.45rem 1rem;
+      border-radius: 25px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(184, 146, 42, 0.3);
+    }
+
+    /* LISTS */
+    .jg-body ul {
+      list-style: none;
+      padding: 0;
+      margin: 0.75rem 0 1.5rem 0;
+    }
+
+    .jg-body ul li {
+      padding: 0.75rem 0 0.75rem 2rem;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .jg-body ul li:last-child {
+      border-bottom: none;
+    }
+
+    .jg-body ul li::before {
+      content: '▶';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-size: 0.6rem;
+      top: 1rem;
+    }
+
+    .jg-body ol {
+      margin: 0.75rem 0 1.5rem 2rem;
+      padding: 0;
+    }
+
+    .jg-body ol li {
+      padding: 0.6rem 0;
+      font-size: 0.95rem;
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    /* TABLES */
+    .jg-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.9rem;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(13, 27, 75, 0.08);
+    }
+
+    .jg-body table thead {
+      background: linear-gradient(135deg, var(--primary) 0%, #0a1436 100%);
+    }
+
+    .jg-body table thead th {
+      color: white;
+      padding: 1.1rem 1.25rem;
+      font-weight: 700;
+      text-align: left;
+      font-size: 0.85rem;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .jg-body table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background-color 0.2s;
+    }
+
+    .jg-body table tbody tr:hover {
+      background: var(--bg-primary);
+    }
+
+    .jg-body table tbody tr:nth-child(even) {
+      background: var(--bg-accent);
+    }
+
+    .jg-body table tbody td {
+      padding: 1rem 1.25rem;
+      color: var(--text);
+      vertical-align: top;
+    }
+
+    .jg-body table.amount-table tbody td:last-child,
+    .jg-body table.amount-table thead th:last-child {
+      text-align: right;
+      font-weight: 700;
+    }
+
+    /* BLOCKQUOTE */
+    .jg-body blockquote {
+      border-left: 5px solid var(--accent);
+      background: linear-gradient(135deg, var(--bg-accent) 0%, var(--bg-primary) 100%);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 8px 8px 0;
+      color: var(--text);
+      font-style: italic;
+      font-weight: 500;
+    }
+
+    .jg-body blockquote p {
+      margin: 0;
+    }
+
+    /* ──── FOOTER ──── */
+    .jg-footer {
+      background: var(--primary);
+      color: white;
+      padding: 3rem 5%;
+      text-align: center;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .jg-footer::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -10%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(184, 146, 42, 0.08) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .jg-footer-wrapper {
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .jg-footer-message {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+
+    .jg-footer-text {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    .jg-footer-text a {
+      color: var(--accent-light);
+      text-decoration: none;
+      font-weight: 600;
+      transition: opacity 0.3s;
+    }
+
+    .jg-footer-text a:hover {
+      opacity: 0.8;
+    }
+
+    /* ──── RESPONSIVE ──── */
+    @media (max-width: 1024px) {
+      .jg-header-inner {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+
+      .jg-brand-section {
+        justify-content: center;
+      }
+
+      .jg-contact-section {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .jg-header {
+        padding: 2rem 3%;
+      }
+
+      .jg-body {
+        padding: 2rem 3%;
+      }
+
+      .jg-footer {
+        padding: 2rem 3%;
+      }
+
+      .jg-brand h1 {
+        font-size: 2.2rem;
+      }
+
+      .jg-body h1 {
+        font-size: 1.8rem;
+      }
+
+      .jg-body h2 {
+        font-size: 1.4rem;
+      }
+
+      .jg-body h3 {
+        font-size: 1.05rem;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .jg-contact-section {
+        grid-template-columns: 1fr;
+      }
+
+      .jg-body table {
+        font-size: 0.85rem;
+      }
+
+      .jg-body table thead th,
+      .jg-body table tbody td {
+        padding: 0.75rem 0.5rem;
+      }
+
+      .jg-body ul li {
+        padding-left: 1.75rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .jg-logo {
+        width: 80px;
+        height: 80px;
+      }
+
+      .jg-brand h1 {
+        font-size: 1.8rem;
+      }
+
+      .jg-body h1 {
+        font-size: 1.5rem;
+      }
+
+      .jg-body h2 {
+        font-size: 1.1rem;
+      }
+
+      .jg-day-badge {
+        font-size: 0.65rem;
+        padding: 0.5rem 0.9rem;
+      }
+
+      .jg-body table {
+        font-size: 0.8rem;
+      }
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .jg-header::before,
+      .jg-footer::before {
+        display: none;
+      }
+
+      .jg-header, .jg-footer {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .jg-body h3, .jg-body table {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="jg-document">
+
+  <!-- ════════════════════════════════════════════════════════════
+       HEADER WITH BRAND & CONTACT
+  ════════════════════════════════════════════════════════════ -->
+  <div class="jg-header">
+    <div class="jg-header-inner">
+      <div class="jg-brand-section">
+        <div class="jg-logo">
+          <img src="{{logoBase64}}" alt="Journey Guide"/>
+        </div>
+        <div class="jg-brand">
+          <h1>Journey <span>Guide</span></h1>
+          <div class="jg-brand-subtitle">Discover the World with Us</div>
+          <div class="jg-brand-rule"></div>
+        </div>
+      </div>
+
+      <div class="jg-contact-section">
+        <div class="jg-contact-item">
+          <i class="bi bi-envelope-fill jg-contact-icon"></i>
+          <div class="jg-contact-content">
+            <span class="jg-contact-value">journey.guide@outlook.com</span>
+          </div>
+        </div>
+
+        <div class="jg-contact-item">
+          <i class="bi bi-telephone-fill jg-contact-icon"></i>
+          <div class="jg-contact-content">
+            <a href="tel:+919270376651" class="jg-contact-value">+91 92703 76651</a>
+          </div>
+        </div>
+
+        <div class="jg-contact-item">
+          <i class="bi bi-whatsapp jg-contact-icon"></i>
+          <div class="jg-contact-content">
+            <a href="https://wa.me/919270376651" class="jg-contact-value">Message Us</a>
+          </div>
+        </div>
+
+        <div class="jg-contact-item">
+          <i class="bi bi-instagram jg-contact-icon"></i>
+          <div class="jg-contact-content">
+            <a href="https://www.instagram.com/journey_guide_/" target="_blank" class="jg-contact-value">@journey_guide_</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       MAIN CONTENT (Pandoc $body$ variable)
+  ════════════════════════════════════════════════════════════ -->
+  <div class="jg-body">
+    <div class="jg-body-wrapper">
+      {{body}}
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       FOOTER
+  ════════════════════════════════════════════════════════════ -->
+  <div class="jg-footer">
+    <div class="jg-footer-wrapper">
+      <div class="jg-footer-message">
+        Thank you for booking with us
+      </div>
+      <div class="jg-footer-text">
+        <strong>Team Journey Guide</strong><br/>
+        <a href="mailto:journey.guide@outlook.com">journey.guide@outlook.com</a> | +91 92703 76651
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Bootstrap JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Pandoc Content Enhancement Script -->
+<script>
+(function() {
+  // Transform h3 into day badges
+  document.querySelectorAll(".jg-body h3").forEach(function(h3) {
+    var text = h3.textContent.trim();
+    h3.innerHTML = '<span class="jg-day-badge">' + text + '</span>';
+  });
+
+  // Transform h4 into activity badges with types
+  document.querySelectorAll(".jg-body h4").forEach(function(h4) {
+    var text = h4.textContent.trim();
+    var parts = text.split(" | ");
+    
+    if (parts.length >= 2) {
+      var type = parts.pop().trim();
+      var title = parts.join(" | ").trim();
+      h4.innerHTML =
+        '<span class="jg-activity-badge">' + type + '</span>' +
+        '<span>' + title + '</span>';
+    } else {
+      h4.innerHTML = '<span>' + text + '</span>';
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
