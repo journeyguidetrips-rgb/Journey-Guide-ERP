@@ -1,5 +1,6 @@
 // src/services/bookingService.ts
 import { pool } from '../database/connection'
+import { randomUUID } from 'crypto';
 
 interface ConvertToBookingData {
   itineraryId: string;
@@ -60,14 +61,6 @@ export const getBookingDetails = async (bookingId: string) => {
   return result.rows[0];
 };
 
-export const generateBookingId = async (): Promise<string> => {
-  const result = await pool.query(
-    `SELECT COUNT(*) as count FROM bookings`
-  );
-  const count = parseInt(result.rows[0].count, 10) + 1;
-  return `JG-${String(count).padStart(4, '0')}`;
-};
-
 export const convertItineraryToBooking = async (
   userId: number,
   { itineraryId, sellingPrice, vendorCost, phone, whatsapp, travelDate, guests, notes }: ConvertToBookingData
@@ -88,8 +81,6 @@ export const convertItineraryToBooking = async (
     }
     const itinerary = itineraryResult.rows[0];
 
-    const bookingId = await generateBookingId();
-
     const bookingResult = await client.query(
       `INSERT INTO bookings (
         itinerary_id, booking_id, client_name, vendor_name,
@@ -101,7 +92,7 @@ export const convertItineraryToBooking = async (
       RETURNING *`,
       [
         itineraryId,
-        bookingId,
+        randomUUID(),
         itinerary.client_name,
         itinerary.vendor_name,
         phone || null,
@@ -270,6 +261,8 @@ export const addClientPayment = async (
       `SELECT selling_price, received_from_client FROM bookings WHERE booking_id = $1 FOR UPDATE`,
       [bookingId]
     );
+
+    console.log("Reterived booking details");
     
     if (bookingResult.rows.length === 0) {
       throw new Error('Booking not found');
@@ -296,6 +289,8 @@ export const addClientPayment = async (
         remarks || null,
       ]
     );
+
+    console.log("Row Inserted");
 
     await client.query(
       `UPDATE bookings 

@@ -19,7 +19,6 @@
   "author": "journeyguidetrips-rgb",
   "license": "MIT",
   "dependencies": {
-    "@types/marked": "^5.0.2",
     "axios": "^1.6.8",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -40,6 +39,7 @@
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
+    "@types/marked": "^5.0.2",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.12.7",
     "@types/pg": "^8.11.5",

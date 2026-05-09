@@ -5,6 +5,7 @@ import fs from 'fs/promises'; // Added to read the file content
 import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from '../middleware/authMiddleware';
 import puppeteer from 'puppeteer';
+import { marked } from 'marked';
 import {
   createItinerary,
   getItinerary,

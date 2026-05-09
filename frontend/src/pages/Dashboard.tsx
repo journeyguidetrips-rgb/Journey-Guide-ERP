@@ -2,15 +2,8 @@ import { useEffect, useState } from 'react'
 import { CreditCard, FileText, Image, Tag, Archive, TrendingUp } from 'lucide-react'
 import axios from 'axios'
 import { useUserStore } from '../stores/userStore'
+import { DashboardMetrics } from '../types/finance'
 
-interface DashboardMetrics {
-  total_bookings: number;
-  total_itineraries: number;
-  total_selling_price: number;
-  total_received: number;
-  total_vendor_cost: number;
-  total_paid_to_vendor: number;
-}
 
 export default function Dashboard() {
   const { token } = useUserStore()
@@ -34,12 +27,12 @@ export default function Dashboard() {
   }, [token])
 
   const stats = [
-    { label: 'Total Bookings',     value: metrics?.total_bookings ?? 0,                                    icon: CreditCard,  color: 'bg-blue-500' },
-    { label: 'Itineraries',        value: metrics?.total_itineraries ?? 0,                                 icon: FileText,    color: 'bg-green-500' },
-    { label: 'Revenue (Selling)',   value: `₹${(metrics?.total_selling_price ?? 0).toLocaleString()}`,     icon: TrendingUp,  color: 'bg-indigo-500' },
-    { label: 'Received from Client',value: `₹${(metrics?.total_received ?? 0).toLocaleString()}`,          icon: Image,       color: 'bg-purple-500' },
-    { label: 'Vendor Cost',         value: `₹${(metrics?.total_vendor_cost ?? 0).toLocaleString()}`,       icon: Tag,         color: 'bg-orange-500' },
-    { label: 'Paid to Vendor',      value: `₹${(metrics?.total_paid_to_vendor ?? 0).toLocaleString()}`,    icon: Archive,     color: 'bg-red-500' },
+    { label: 'Total Bookings', value: metrics?.total_bookings ?? 0, icon: CreditCard, color: 'bg-blue-500' },
+    { label: 'Itineraries', value: metrics?.total_itineraries ?? 0, icon: FileText, color: 'bg-green-500' },
+    { label: 'Revenue (Selling)', value: `₹${(metrics?.total_selling_price ?? 0).toLocaleString()}`, icon: TrendingUp,  color: 'bg-indigo-500' },
+    { label: 'Received from Client', value: `₹${(metrics?.total_received_from_client ?? 0).toLocaleString()}`, icon: Image, color: 'bg-purple-500' },
+    { label: 'Vendor Cost', value: `₹${(metrics?.total_vendor_cost ?? 0).toLocaleString()}`, icon: Tag, color: 'bg-orange-500' },
+    { label: 'Paid to Vendor', value: `₹${(metrics?.total_paid_to_vendor ?? 0).toLocaleString()}`, icon: Archive, color: 'bg-red-500' },
   ]
 
   return (

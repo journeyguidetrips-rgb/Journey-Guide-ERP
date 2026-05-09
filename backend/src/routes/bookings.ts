@@ -27,6 +27,84 @@ import {
 
 const router = Router();
 
+router.post<
+  { bookingId: string },
+  AddClientPaymentResponse | ApiErrorResponse,
+  AddClientPaymentRequest
+>('/:bookingId/client-payments', authenticate, async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { 
+      clientName,
+      paymentDate,
+      paymentType,
+      amount,
+      paymentMode,
+      referenceUtr,
+      packageName,
+      remarks,
+    } = req.body;
+
+    if (!clientName || !paymentDate || !paymentType || amount === undefined || !paymentMode) {
+      return res.status(400).json({ error: 'Missing required payment fields' });
+    }
+
+    const result = await addClientPayment(bookingId, {
+      clientName,
+      paymentDate,
+      paymentType,
+      amount,
+      paymentMode,
+      referenceUtr,
+      packageName,
+      remarks,
+    });
+    
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post<
+  { bookingId: string },
+  AddVendorPaymentResponse | ApiErrorResponse,
+  AddVendorPaymentRequest
+>('/:bookingId/vendor-payments', authenticate, async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { 
+      clientName,
+      vendorName,
+      datePaid,
+      amountPaid,
+      paymentMode,
+      referenceUtr,
+      packageName,
+      remarks,
+    } = req.body;
+
+    if (!clientName || !vendorName || !datePaid || amountPaid === undefined || !paymentMode) {
+      return res.status(400).json({ error: 'Missing required payment fields' });
+    }
+
+    const result = await addVendorPayment(bookingId, {
+      clientName,
+      vendorName,
+      datePaid,
+      amountPaid,
+      paymentMode,
+      referenceUtr,
+      packageName,
+      remarks,
+    });
+    
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // ✅ GET /api/bookings/client-payments - List all client payments
 router.get('/client-payments', authenticate, async (req: Request, res: Response) => {
   try {
@@ -181,84 +259,6 @@ router.get<
     res.json(data);
   } catch (error: any) {
     res.status(404).json({ error: error.message || 'Booking not found' });
-  }
-});
-
-router.post<
-  { bookingId: string },
-  AddClientPaymentResponse | ApiErrorResponse,
-  AddClientPaymentRequest
->('/:bookingId/client-payments', authenticate, async (req, res) => {
-  try {
-    const { bookingId } = req.params;
-    const { 
-      clientName,
-      paymentDate,
-      paymentType,
-      amount,
-      paymentMode,
-      referenceUtr,
-      packageName,
-      remarks,
-    } = req.body;
-
-    if (!clientName || !paymentDate || !paymentType || amount === undefined || !paymentMode) {
-      return res.status(400).json({ error: 'Missing required payment fields' });
-    }
-
-    const result = await addClientPayment(bookingId, {
-      clientName,
-      paymentDate,
-      paymentType,
-      amount,
-      paymentMode,
-      referenceUtr,
-      packageName,
-      remarks,
-    });
-    
-    res.json(result);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-router.post<
-  { bookingId: string },
-  AddVendorPaymentResponse | ApiErrorResponse,
-  AddVendorPaymentRequest
->('/:bookingId/vendor-payments', authenticate, async (req, res) => {
-  try {
-    const { bookingId } = req.params;
-    const { 
-      clientName,
-      vendorName,
-      datePaid,
-      amountPaid,
-      paymentMode,
-      referenceUtr,
-      packageName,
-      remarks,
-    } = req.body;
-
-    if (!clientName || !vendorName || !datePaid || amountPaid === undefined || !paymentMode) {
-      return res.status(400).json({ error: 'Missing required payment fields' });
-    }
-
-    const result = await addVendorPayment(bookingId, {
-      clientName,
-      vendorName,
-      datePaid,
-      amountPaid,
-      paymentMode,
-      referenceUtr,
-      packageName,
-      remarks,
-    });
-    
-    res.json(result);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
   }
 });
 
