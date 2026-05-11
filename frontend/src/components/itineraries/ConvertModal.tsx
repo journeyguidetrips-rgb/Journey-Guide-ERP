@@ -69,9 +69,17 @@ export default function ConvertModal({
               <label className="block text-sm font-medium mb-1">Phone</label>
               <input
                 type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={10}
                 value={form.phone}
-                onChange={e => set({ phone: e.target.value })}
-                placeholder="+91 XXXXX XXXXX"
+                onChange={e => set({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                onBlur={(e) => {
+                  if (!form.whatsapp) {
+                    set({ whatsapp: e.target.value });
+                  }
+                }}
+                placeholder="XXXXXXXXXX"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
             </div>
@@ -79,9 +87,12 @@ export default function ConvertModal({
               <label className="block text-sm font-medium mb-1">WhatsApp</label>
               <input
                 type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={10}
                 value={form.whatsapp}
-                onChange={e => set({ whatsapp: e.target.value })}
-                placeholder="+91 XXXXX XXXXX"
+                onChange={e => set({ whatsapp: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                placeholder="XXXXXXXXXX"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
             </div>
@@ -119,9 +130,6 @@ export default function ConvertModal({
 
           <div className="bg-purple-50 p-4 rounded-xl text-sm space-y-1">
             <p className="font-medium text-purple-900">Booking Summary</p>
-            <p className="text-purple-700">
-              Booking ID: <span className="font-mono">JG-XXXX (auto-generated)</span>
-            </p>
             <p className="text-purple-700">
               Selling Price: ₹{form.sellingPrice ? parseFloat(form.sellingPrice).toLocaleString() : '0'}
             </p>
