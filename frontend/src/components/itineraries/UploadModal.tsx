@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import VendorAutocomplete from '../shared/VendorAutocomplete'
 
 interface UploadModalProps {
   vendorName: string
@@ -32,12 +33,10 @@ export default function UploadModal({
         <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">Vendor Name *</label>
-            <input
-              type="text"
+            <VendorAutocomplete
               value={vendorName}
-              onChange={e => onVendorChange(e.target.value)}
-              placeholder="e.g., Taj Hotels"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+              onSelect={(_vendor, name) => onVendorChange(name)}
+              placeholder="Type 3+ letters to search registered vendors..."
             />
           </div>
 

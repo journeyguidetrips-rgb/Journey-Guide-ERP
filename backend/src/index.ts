@@ -6,6 +6,7 @@ import { pool } from './database/connection';
 import authRoutes from './routes/auth';
 import itineraryRoutes from './routes/itineraries';
 import bookingsRoutes from './routes/bookings';
+import vendorRoutes from './routes/vendors';
 
 // Load environment variables
 dotenv.config();
@@ -94,6 +95,9 @@ app.use('/api/itineraries', itineraryRoutes);
 
 // Bookings route
 app.use('/api/bookings', bookingsRoutes);
+
+// Vendor routes
+app.use('/api/vendors', vendorRoutes);
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

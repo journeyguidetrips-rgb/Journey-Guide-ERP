@@ -1,12 +1,15 @@
 // src/routes/bookings.ts
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/authMiddleware';
-import { 
-  convertItineraryToBooking, 
+import {
+  convertItineraryToBooking,
   revertBookingToItinerary,
   getBookingWithPayments,
   addClientPayment,
   addVendorPayment,
+  updateBooking,
+  updateClientPayment,
+  updateVendorPayment,
   getBookings,
   getBookingDetails,
   getClientPayments,
@@ -237,16 +240,17 @@ router.get('/:bookingId/details', authenticate, async (req, res) => {
 
 router.post<{}>('/convert', authenticate, async (req, res) => {
   try {
-    const { itineraryId, sellingPrice, vendorCost, phone, whatsapp, travelDate, guests, notes } = req.body;
-    
+    const { itineraryId, sellingPrice, vendorCost, vendorName, phone, whatsapp, travelDate, guests, notes } = req.body;
+
     if (!itineraryId || sellingPrice === undefined || vendorCost === undefined) {
       return res.status(400).json({ error: 'Missing required fields: itineraryId, sellingPrice, vendorCost' });
     }
-    
+
     const result = await convertItineraryToBooking(req.user!.id, {
       itineraryId,
       sellingPrice,
       vendorCost,
+      vendorName,
       phone,
       whatsapp,
       travelDate,
@@ -269,6 +273,60 @@ router.post<{ itineraryId: string }, {}>('/:itineraryId/revert', authenticate, a
     res.status(400).json({ error: error.message });
   }
 });
+
+// PUT /api/bookings/:bookingId — update booking fields
+router.put<{ bookingId: string }>('/:bookingId', authenticate, async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const {
+      clientName, vendorName, phone, whatsapp, packageName,
+      travelDate, guests, sellingPrice, vendorCost, notes, clientStatus, reminderDate,
+    } = req.body;
+    const updated = await updateBooking(req.user!.id, bookingId, {
+      clientName, vendorName, phone, whatsapp, packageName,
+      travelDate, guests, sellingPrice, vendorCost, notes, clientStatus, reminderDate,
+    });
+    res.json({ success: true, booking: updated });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// PUT /api/bookings/:bookingId/client-payments/:paymentId — edit a client payment
+router.put<{ bookingId: string; paymentId: string }>(
+  '/:bookingId/client-payments/:paymentId',
+  authenticate,
+  async (req, res) => {
+    try {
+      const { bookingId, paymentId } = req.params;
+      const { clientName, paymentDate, paymentType, amount, paymentMode, referenceUtr, packageName, remarks } = req.body;
+      const updated = await updateClientPayment(bookingId, parseInt(paymentId), {
+        clientName, paymentDate, paymentType, amount, paymentMode, referenceUtr, packageName, remarks,
+      });
+      res.json({ success: true, payment: updated });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+);
+
+// PUT /api/bookings/:bookingId/vendor-payments/:paymentId — edit a vendor payment
+router.put<{ bookingId: string; paymentId: string }>(
+  '/:bookingId/vendor-payments/:paymentId',
+  authenticate,
+  async (req, res) => {
+    try {
+      const { bookingId, paymentId } = req.params;
+      const { clientName, vendorName, datePaid, amountPaid, paymentMode, referenceUtr, packageName, remarks } = req.body;
+      const updated = await updateVendorPayment(bookingId, parseInt(paymentId), {
+        clientName, vendorName, datePaid, amountPaid, paymentMode, referenceUtr, packageName, remarks,
+      });
+      res.json({ success: true, payment: updated });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+);
 
 router.get<{ bookingId: string }>('/:bookingId', authenticate, async (req, res) => {
   try {

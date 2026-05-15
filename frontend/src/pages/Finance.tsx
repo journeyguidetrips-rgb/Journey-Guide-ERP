@@ -2,15 +2,19 @@ import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { Download } from 'lucide-react'
 import { useFinance } from '../hooks/useFinance'
-import { postClientPayment, postVendorPayment, downloadPaymentReceipt } from '../services/bookingService'
+import {
+  postClientPayment, postVendorPayment, downloadPaymentReceipt,
+  patchBooking, patchClientPayment, patchVendorPayment,
+} from '../services/bookingService'
 import { useUserStore } from '../stores/userStore'
-import { TabView, PaymentForm, VendorPaymentForm, Booking } from '../types/finance'
+import { TabView, PaymentForm, VendorPaymentForm, Booking, ClientPayment, VendorPayment } from '../types/finance'
 import DashboardTab from '../components/finance/DashboardTab'
 import BookingsTab from '../components/finance/BookingsTab'
 import PaymentsTab from '../components/finance/PaymentsTab'
 import ClientPaymentModal from '../components/finance/ClientPaymentModal'
 import VendorPaymentModal from '../components/finance/VendorPaymentModal'
 import BookingDetailsModal from '../components/finance/BookingDetailsModal'
+import PaymentDetailModal from '../components/finance/PaymentDetailModal'
 
 const TABS: { key: TabView; label: string }[] = [
   { key: 'dashboard',        label: 'Dashboard' },
@@ -51,11 +55,14 @@ export default function Finance() {
   const [searchQuery, setSearchQuery]           = useState('')
   const [statusFilter, setStatusFilter]         = useState('')
   const [dateFilter, setDateFilter]             = useState('')
-  const [showClientModal, setShowClientModal]   = useState(false)
-  const [showVendorModal, setShowVendorModal]   = useState(false)
-  const [showDetailsModal, setShowDetailsModal] = useState(false)
-  const [clientForm, setClientForm]             = useState<PaymentForm>(DEFAULT_CLIENT_FORM)
-  const [vendorForm, setVendorForm]             = useState<VendorPaymentForm>(DEFAULT_VENDOR_FORM)
+  const [showClientModal, setShowClientModal]       = useState(false)
+  const [showVendorModal, setShowVendorModal]       = useState(false)
+  const [showDetailsModal, setShowDetailsModal]     = useState(false)
+  const [showPaymentDetail, setShowPaymentDetail]   = useState(false)
+  const [selectedPayment, setSelectedPayment]       = useState<ClientPayment | VendorPayment | null>(null)
+  const [isClientPayment, setIsClientPayment]       = useState(true)
+  const [clientForm, setClientForm]                 = useState<PaymentForm>(DEFAULT_CLIENT_FORM)
+  const [vendorForm, setVendorForm]                 = useState<VendorPaymentForm>(DEFAULT_VENDOR_FORM)
 
   useEffect(() => {
     switch (activeTab) {
@@ -161,6 +168,59 @@ export default function Finance() {
     }
   }
 
+  const handlePaymentRowClick = useCallback((payment: ClientPayment | VendorPayment, isClient: boolean) => {
+    setSelectedPayment(payment)
+    setIsClientPayment(isClient)
+    setShowPaymentDetail(true)
+  }, [])
+
+  const handleUpdateBooking = useCallback(async (bookingId: string, data: Partial<Booking>) => {
+    await patchBooking(token!, bookingId, {
+      clientName:   (data as any).client_name,
+      vendorName:   (data as any).vendor_name,
+      phone:        (data as any).phone,
+      whatsapp:     (data as any).whatsapp,
+      packageName:  (data as any).package_name,
+      travelDate:   (data as any).travel_date,
+      guests:       (data as any).guests,
+      sellingPrice: (data as any).selling_price,
+      vendorCost:   (data as any).vendor_cost,
+      notes:        (data as any).notes,
+      clientStatus: (data as any).client_status,
+      reminderDate: (data as any).reminder_date,
+    })
+    toast.success('Booking updated!')
+    // Refresh both the list and the open details modal
+    loadBookings(true)
+    if (selectedBooking?.booking.booking_id === bookingId) {
+      loadBookingDetails(bookingId)
+    }
+  }, [token, loadBookings, loadBookingDetails, selectedBooking])
+
+  const handleSavePaymentEdit = useCallback(async (
+    paymentId: number,
+    bookingId: string,
+    data: Record<string, unknown>
+  ) => {
+    if (isClientPayment) {
+      await patchClientPayment(token!, bookingId, paymentId, data)
+    } else {
+      await patchVendorPayment(token!, bookingId, paymentId, data)
+    }
+    toast.success('Payment updated!')
+    setShowPaymentDetail(false)
+    setSelectedPayment(null)
+    // Refresh the current payments list and booking details if open
+    if (isClientPayment) {
+      loadClientPayments(true)
+    } else {
+      loadVendorPayments(true)
+    }
+    if (selectedBooking?.booking.booking_id === bookingId) {
+      loadBookingDetails(bookingId)
+    }
+  }, [token, isClientPayment, loadClientPayments, loadVendorPayments, loadBookingDetails, selectedBooking])
+
   const exportToCSV = (type: 'bookings' | 'client' | 'vendor') => {
     const rows = {
       bookings: {
@@ -265,6 +325,7 @@ export default function Finance() {
             hasMoreRef={hasMoreRef}
             fetchLock={fetchLock}
             onFetchMore={() => loadClientPayments(false)}
+            onRowClick={p => handlePaymentRowClick(p, true)}
             onDownloadReceipt={handleDownloadReceipt}
           />
         )}
@@ -277,6 +338,7 @@ export default function Finance() {
             hasMoreRef={hasMoreRef}
             fetchLock={fetchLock}
             onFetchMore={() => loadVendorPayments(false)}
+            onRowClick={p => handlePaymentRowClick(p, false)}
           />
         )}
 
@@ -340,6 +402,17 @@ export default function Finance() {
             setVendorForm(prev => ({ ...prev, bookingId, clientName, vendorName }))
             setShowVendorModal(true)
           }}
+          onUpdateBooking={handleUpdateBooking}
+        />
+      )}
+
+      {showPaymentDetail && selectedPayment && (
+        <PaymentDetailModal
+          payment={selectedPayment}
+          isClient={isClientPayment}
+          saving={saving}
+          onSave={handleSavePaymentEdit}
+          onClose={() => { setShowPaymentDetail(false); setSelectedPayment(null) }}
         />
       )}
     </div>

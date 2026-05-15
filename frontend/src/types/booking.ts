@@ -2,6 +2,7 @@ export interface ConvertToBookingRequest {
   itineraryId: string;
   sellingPrice: number;
   vendorCost: number;
+  vendorName?: string;
   phone?: string;
   whatsapp?: string;
   travelDate?: string;

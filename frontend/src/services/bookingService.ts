@@ -56,6 +56,25 @@ export const postVendorPayment = (
     headers: authHeader(token),
   })
 
+export const patchBooking = (token: string, bookingId: string, data: Record<string, unknown>) =>
+  api.put(`/bookings/${bookingId}`, data, { headers: authHeader(token) })
+
+export const patchClientPayment = (
+  token: string,
+  bookingId: string,
+  paymentId: number,
+  data: Record<string, unknown>
+) =>
+  api.put(`/bookings/${bookingId}/client-payments/${paymentId}`, data, { headers: authHeader(token) })
+
+export const patchVendorPayment = (
+  token: string,
+  bookingId: string,
+  paymentId: number,
+  data: Record<string, unknown>
+) =>
+  api.put(`/bookings/${bookingId}/vendor-payments/${paymentId}`, data, { headers: authHeader(token) })
+
 export const downloadPaymentReceipt = (
   token: string,
   bookingId: string,

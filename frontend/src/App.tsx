@@ -11,6 +11,7 @@ import Itineraries from './pages/Itineraries'
 import Watermark from './pages/Watermark'
 import Placards from './pages/Placards'
 import Logs from './pages/Logs'
+import Vendors from './pages/Vendors'
 import { Toaster } from 'react-hot-toast'
 import { useUserStore } from './stores/userStore'
 
@@ -50,6 +51,14 @@ function App() {
                   element={
                     <ProtectedRoute requiredPermissions={['view_itineraries']} requireAny>
                       <Itineraries />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/vendors"
+                  element={
+                    <ProtectedRoute requiredPermissions={['view_itineraries']} requireAny>
+                      <Vendors />
                     </ProtectedRoute>
                   }
                 />

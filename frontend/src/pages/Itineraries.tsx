@@ -21,7 +21,7 @@ import EditorModal from '../components/itineraries/EditorModal'
 import ConvertModal from '../components/itineraries/ConvertModal'
 
 const DEFAULT_BOOKING_FORM = {
-  sellingPrice: '', vendorCost: '', phone: '', whatsapp: '',
+  sellingPrice: '', vendorCost: '', vendorName: '', phone: '', whatsapp: '',
   travelDate: '', guests: '1', notes: '',
 }
 
@@ -164,7 +164,7 @@ export default function Itineraries() {
 
   const handleConvert = (itinerary: Itinerary) => {
     setConvertingItinerary(itinerary)
-    setBookingForm(DEFAULT_BOOKING_FORM)
+    setBookingForm({ ...DEFAULT_BOOKING_FORM, vendorName: itinerary.vendor_name })
     setShowConvertModal(true)
   }
 
@@ -176,6 +176,7 @@ export default function Itineraries() {
         itineraryId: convertingItinerary.id,
         sellingPrice: parseFloat(bookingForm.sellingPrice) || 0,
         vendorCost: parseFloat(bookingForm.vendorCost) || 0,
+        vendorName: bookingForm.vendorName || undefined,
         phone: bookingForm.phone,
         whatsapp: bookingForm.whatsapp,
         travelDate: bookingForm.travelDate,

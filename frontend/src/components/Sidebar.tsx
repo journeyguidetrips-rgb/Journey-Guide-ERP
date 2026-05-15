@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, CreditCard, MapPin, Palette, Tag, Archive } from 'lucide-react'
+import { LayoutDashboard, CreditCard, MapPin, Palette, Tag, Archive, Building2 } from 'lucide-react'
 import clsx from 'clsx'
 import { useUserStore } from '../stores/userStore'
 
@@ -7,6 +7,7 @@ const menuItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'view_dashboard' },
   { path: '/payments', label: 'Payments', icon: CreditCard, permission: 'view_payments' },
   { path: '/itineraries', label: 'Itineraries', icon: MapPin, permission: 'view_itineraries' },
+  { path: '/vendors', label: 'Vendors', icon: Building2, permission: 'view_itineraries' },
   { path: '/watermark', label: 'Watermark', icon: Palette, permission: 'manage_watermarks' },
   { path: '/placards', label: 'Placards', icon: Tag, permission: 'manage_placards' },
   { path: '/logs', label: 'Logs', icon: Archive, permission: 'view_logs' },

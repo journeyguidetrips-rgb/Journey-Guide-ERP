@@ -6,6 +6,7 @@ interface ConvertToBookingData {
   itineraryId: string;
   sellingPrice: number;
   vendorCost: number;
+  vendorName?: string;
   phone?: string;
   whatsapp?: string;
   travelDate?: string;
@@ -63,7 +64,7 @@ export const getBookingDetails = async (bookingId: string) => {
 
 export const convertItineraryToBooking = async (
   userId: number,
-  { itineraryId, sellingPrice, vendorCost, phone, whatsapp, travelDate, guests, notes }: ConvertToBookingData
+  { itineraryId, sellingPrice, vendorCost, vendorName, phone, whatsapp, travelDate, guests, notes }: ConvertToBookingData
 ) => {
   const client = await pool.connect();
   
@@ -94,7 +95,7 @@ export const convertItineraryToBooking = async (
         itineraryId,
         randomUUID(),
         itinerary.client_name,
-        itinerary.vendor_name,
+        vendorName || itinerary.vendor_name,
         phone || null,
         whatsapp || null,
         itinerary.client_name,
@@ -397,6 +398,193 @@ export const addVendorPayment = async (
       },
     };
 
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const updateBooking = async (
+  userId: number,
+  bookingId: string,
+  data: {
+    clientName?: string;
+    vendorName?: string;
+    phone?: string | null;
+    whatsapp?: string | null;
+    packageName?: string;
+    travelDate?: string | null;
+    guests?: number;
+    sellingPrice?: number;
+    vendorCost?: number;
+    notes?: string | null;
+    clientStatus?: string;
+    reminderDate?: string | null;
+  }
+) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Verify ownership via itinerary join
+    const check = await client.query(
+      `SELECT b.booking_id FROM bookings b
+       INNER JOIN itineraries i ON b.itinerary_id = i.id
+       WHERE b.booking_id = $1 AND i.user_id = $2`,
+      [bookingId, userId]
+    );
+    if (check.rows.length === 0) throw new Error('Booking not found');
+
+    const result = await client.query(
+      `UPDATE bookings SET
+         client_name   = COALESCE($1,  client_name),
+         vendor_name   = COALESCE($2,  vendor_name),
+         phone         = $3,
+         whatsapp      = $4,
+         package_name  = COALESCE($5,  package_name),
+         travel_date   = $6,
+         guests        = COALESCE($7,  guests),
+         selling_price = COALESCE($8,  selling_price),
+         vendor_cost   = COALESCE($9,  vendor_cost),
+         notes         = $10,
+         client_status = COALESCE($11, client_status),
+         reminder_date = $12,
+         updated_at    = NOW()
+       WHERE booking_id = $13
+       RETURNING *`,
+      [
+        data.clientName, data.vendorName,
+        data.phone ?? null, data.whatsapp ?? null,
+        data.packageName,
+        data.travelDate ?? null,
+        data.guests, data.sellingPrice, data.vendorCost,
+        data.notes ?? null,
+        data.clientStatus,
+        data.reminderDate ?? null,
+        bookingId,
+      ]
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const updateClientPayment = async (
+  bookingId: string,
+  paymentId: number,
+  data: {
+    clientName?: string;
+    paymentDate?: string;
+    paymentType?: string;
+    amount?: number;
+    paymentMode?: string;
+    referenceUtr?: string | null;
+    packageName?: string | null;
+    remarks?: string | null;
+  }
+) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE client_payments SET
+         client_name   = COALESCE($1, client_name),
+         payment_date  = COALESCE($2, payment_date),
+         payment_type  = COALESCE($3, payment_type),
+         amount        = COALESCE($4, amount),
+         payment_mode  = COALESCE($5, payment_mode),
+         reference_utr = $6,
+         package_name  = $7,
+         remarks       = $8
+       WHERE id = $9 AND booking_id = $10
+       RETURNING *`,
+      [
+        data.clientName, data.paymentDate, data.paymentType, data.amount, data.paymentMode,
+        data.referenceUtr ?? null, data.packageName ?? null, data.remarks ?? null,
+        paymentId, bookingId,
+      ]
+    );
+    if (result.rows.length === 0) throw new Error('Payment not found');
+
+    // Recompute and sync the booking cache column
+    const sumResult = await client.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM client_payments WHERE booking_id = $1`,
+      [bookingId]
+    );
+    await client.query(
+      `UPDATE bookings SET received_from_client = $1, updated_at = NOW() WHERE booking_id = $2`,
+      [sumResult.rows[0].total, bookingId]
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const updateVendorPayment = async (
+  bookingId: string,
+  paymentId: number,
+  data: {
+    clientName?: string;
+    vendorName?: string;
+    datePaid?: string;
+    amountPaid?: number;
+    paymentMode?: string;
+    referenceUtr?: string | null;
+    packageName?: string | null;
+    remarks?: string | null;
+  }
+) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE vendor_payments SET
+         client_name   = COALESCE($1, client_name),
+         vendor_name   = COALESCE($2, vendor_name),
+         date_paid     = COALESCE($3, date_paid),
+         amount_paid   = COALESCE($4, amount_paid),
+         payment_mode  = COALESCE($5, payment_mode),
+         reference_utr = $6,
+         package_name  = $7,
+         remarks       = $8
+       WHERE id = $9 AND booking_id = $10
+       RETURNING *`,
+      [
+        data.clientName, data.vendorName, data.datePaid, data.amountPaid, data.paymentMode,
+        data.referenceUtr ?? null, data.packageName ?? null, data.remarks ?? null,
+        paymentId, bookingId,
+      ]
+    );
+    if (result.rows.length === 0) throw new Error('Payment not found');
+
+    // Recompute and sync the booking cache column
+    const sumResult = await client.query(
+      `SELECT COALESCE(SUM(amount_paid), 0) AS total FROM vendor_payments WHERE booking_id = $1`,
+      [bookingId]
+    );
+    await client.query(
+      `UPDATE bookings SET paid_to_vendor = $1, updated_at = NOW() WHERE booking_id = $2`,
+      [sumResult.rows[0].total, bookingId]
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0];
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

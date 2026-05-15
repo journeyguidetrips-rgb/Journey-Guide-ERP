@@ -1,9 +1,11 @@
 import { Shuffle, X } from 'lucide-react'
 import { Itinerary } from '../../types/itinerary'
+import VendorAutocomplete from '../shared/VendorAutocomplete'
 
 interface BookingFormState {
   sellingPrice: string
   vendorCost: string
+  vendorName: string
   phone: string
   whatsapp: string
   travelDate: string
@@ -44,6 +46,15 @@ export default function ConvertModal({
         </div>
 
         <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Vendor</label>
+            <VendorAutocomplete
+              value={form.vendorName}
+              onSelect={(_vendor, name) => set({ vendorName: name })}
+              placeholder="Type 3+ letters to search registered vendors..."
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Selling Price (₹) *</label>

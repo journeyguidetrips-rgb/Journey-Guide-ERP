@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react'
-import { FileDown } from 'lucide-react'
+import { FileDown, Pencil } from 'lucide-react'
 import { ClientPayment, VendorPayment } from '../../types/finance'
 import { formatCurrency, formatDate, getPaymentTypeStyle } from '../../utils/formatters'
 
@@ -10,6 +10,7 @@ interface PaymentsTabProps {
   hasMoreRef: React.MutableRefObject<boolean>
   fetchLock: React.MutableRefObject<boolean>
   onFetchMore: () => void
+  onRowClick: (payment: ClientPayment | VendorPayment) => void
   onDownloadReceipt?: (paymentId: number, bookingId: string) => void
 }
 
@@ -20,6 +21,7 @@ export default function PaymentsTab({
   hasMoreRef,
   fetchLock,
   onFetchMore,
+  onRowClick,
   onDownloadReceipt,
 }: PaymentsTabProps) {
   const observer = useRef<IntersectionObserver | null>(null)
@@ -33,7 +35,7 @@ export default function PaymentsTab({
     observer.current.observe(node)
   }, [loading, hasMoreRef, fetchLock, onFetchMore])
 
-  const clientColSpan = isClient ? 9 : 7
+  const clientColSpan = isClient ? 9 : 8
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
@@ -48,7 +50,7 @@ export default function PaymentsTab({
             <th className="px-4 py-3">Mode</th>
             <th className="px-4 py-3">UTR / Ref</th>
             <th className="px-4 py-3">Remarks</th>
-            {isClient && <th className="px-4 py-3 text-center">Receipt</th>}
+            <th className="px-4 py-3 text-center">{isClient ? 'Actions' : 'Edit'}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -69,7 +71,8 @@ export default function PaymentsTab({
               <tr
                 key={p.id}
                 ref={idx === payments.length - 1 ? lastRowRef : null}
-                className="bg-white hover:bg-gray-50 transition"
+                className="bg-white hover:bg-gray-50 transition cursor-pointer"
+                onClick={() => onRowClick(p)}
               >
                 <td className="px-4 py-3 font-mono text-purple-600 font-medium">{p.booking_id}</td>
                 <td className="px-4 py-3 font-medium">
@@ -96,17 +99,26 @@ export default function PaymentsTab({
                 >
                   {p.remarks || '-'}
                 </td>
-                {isClient && (
-                  <td className="px-4 py-3 text-center">
+                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                  <div className="inline-flex items-center gap-1">
                     <button
-                      onClick={() => onDownloadReceipt?.(p.id, p.booking_id)}
-                      title="Download Receipt PDF"
-                      className="inline-flex items-center justify-center p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition"
+                      onClick={() => onRowClick(p)}
+                      title="Edit payment"
+                      className="inline-flex items-center justify-center p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition"
                     >
-                      <FileDown size={16} />
+                      <Pencil size={14} />
                     </button>
-                  </td>
-                )}
+                    {isClient && (
+                      <button
+                        onClick={() => onDownloadReceipt?.(p.id, p.booking_id)}
+                        title="Download Receipt PDF"
+                        className="inline-flex items-center justify-center p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition"
+                      >
+                        <FileDown size={16} />
+                      </button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))
           )}
