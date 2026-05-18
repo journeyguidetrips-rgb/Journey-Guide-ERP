@@ -43,6 +43,7 @@ export default function Itineraries() {
   const [vendorName, setVendorName]                 = useState('')
   const [clientName, setClientName]                 = useState('')
   const [uploading, setUploading]                   = useState(false)
+  const [pasteContent, setPasteContent]             = useState('')
   const [bookingForm, setBookingForm]               = useState(DEFAULT_BOOKING_FORM)
 
   const observer = useRef<IntersectionObserver | null>(null)
@@ -85,6 +86,38 @@ export default function Itineraries() {
         setVendorName('')
         setClientName('')
         toast.success('Itinerary uploaded successfully')
+        refresh()
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handlePasteSubmit = async () => {
+    if (!vendorName || !clientName || !pasteContent.trim()) {
+      toast.error('Please enter vendor/client names and markdown content')
+      return
+    }
+    setUploading(true)
+    const file = new File([pasteContent], 'itinerary.md', { type: 'text/markdown' })
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('vendorName', vendorName)
+    formData.append('clientName', clientName)
+    try {
+      const { data } = await uploadItinerary(token!, formData)
+      if (data.success) {
+        setSelectedItinerary(data.itinerary)
+        setEditContent(data.itinerary.content)
+        setSourceContent(data.itinerary.source_content)
+        setShowUploadModal(false)
+        setShowEditor(true)
+        setVendorName('')
+        setClientName('')
+        setPasteContent('')
+        toast.success('Itinerary created successfully')
         refresh()
       }
     } catch (error: any) {
@@ -279,10 +312,13 @@ export default function Itineraries() {
           vendorName={vendorName}
           clientName={clientName}
           uploading={uploading}
+          pasteContent={pasteContent}
           onVendorChange={setVendorName}
           onClientChange={setClientName}
           onFileChange={handleFileUpload}
-          onClose={() => setShowUploadModal(false)}
+          onPasteContentChange={setPasteContent}
+          onPasteSubmit={handlePasteSubmit}
+          onClose={() => { setShowUploadModal(false); setPasteContent('') }}
         />
       )}
 
