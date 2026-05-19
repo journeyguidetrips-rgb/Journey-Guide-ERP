@@ -41,13 +41,17 @@ export async function generateItineraryPDF(itineraryId: string): Promise<Buffer>
 }
 
 export async function generateReceiptPDF(bookingId: string, paymentId: string): Promise<{ buffer: Buffer; filename: string }> {
-  const { userId } = getContext();
+  const { userId, orgId, roleId } = getContext();
+
+  // Admins see all bookings in their org; staff only see their own.
+  const scopeCondition = roleId === 1 ? 'i.org_id = $2' : 'i.user_id = $2';
+  const scopeValue     = roleId === 1 ? orgId : userId;
 
   const ownerCheck = await pool.query(
     `SELECT b.booking_id FROM bookings b
      INNER JOIN itineraries i ON b.itinerary_id = i.id
-     WHERE b.booking_id = $1 AND i.user_id = $2`,
-    [bookingId, userId]
+     WHERE b.booking_id = $1 AND ${scopeCondition}`,
+    [bookingId, scopeValue]
   );
   if (ownerCheck.rows.length === 0) throw new Error('Booking not found');
 

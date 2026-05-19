@@ -80,7 +80,8 @@ export const registerUser = async (
   password: string,
   firstName: string,
   lastName: string,
-  roleId: number = 3
+  roleId: number = 3,
+  orgId: number = 1
 ): Promise<User | null> => {
   try {
     if (!email || !password || !firstName || !lastName) {
@@ -106,10 +107,10 @@ export const registerUser = async (
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const insertResult = await pool.query(
-      `INSERT INTO users (email, password, first_name, last_name, role_id, is_active)
-       VALUES ($1, $2, $3, $4, $5, true)
-       RETURNING id, email, first_name, last_name, role_id, is_active, created_at`,
-      [email, hashedPassword, firstName, lastName, roleId]
+      `INSERT INTO users (email, password, first_name, last_name, role_id, org_id, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, true)
+       RETURNING id, email, first_name, last_name, role_id, org_id, is_active, created_at`,
+      [email, hashedPassword, firstName, lastName, roleId, orgId]
     );
 
     return insertResult.rows[0] ?? null;

@@ -4,6 +4,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from '../middleware/authMiddleware';
+import { getContext } from '../context/requestContext';
+import { pool } from '../database/connection';
 import { marked } from 'marked';
 import {
   createItinerary,
@@ -151,9 +153,13 @@ router.put('/:id', authenticate, validateRequest(UpdateItinerarySchema), async (
     const logoBase64 = logoBuffer.toString('base64');
     const logoSrc = `data:image/png;base64,${logoBase64}`;
 
+    const { orgId } = getContext();
+    const orgResult = await pool.query('SELECT name FROM organizations WHERE id = $1', [orgId]);
+    const orgName = orgResult.rows[0]?.name || 'Journey Guide';
+
     const template = await fs.readFile(templateFile, 'utf-8');
     const finalHtml = template
-      .replace('{{title}}', 'Journey Guide')
+      .replace('{{title}}', orgName)
       .replace('{{meta-tags}}', '')
       .replace('{{logoBase64}}', `${logoSrc}`)
       .replace('{{body}}', htmlBody);

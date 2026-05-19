@@ -41,6 +41,7 @@ router.get('/', authenticate, isAdmin, async (_req: Request, res: Response) => {
 
 // PUT /api/settings — update the org profile
 router.put('/', authenticate, isAdmin, async (req: Request, res: Response) => {
+  const client = await pool.connect();
   try {
     const { orgId } = getContext();
     const {
@@ -48,13 +49,13 @@ router.put('/', authenticate, isAdmin, async (req: Request, res: Response) => {
       ifscCode, upiId, address, phone, email, terms,
     } = req.body;
 
-    await pool.query('BEGIN');
+    await client.query('BEGIN');
 
     if (companyName !== undefined) {
-      await pool.query('UPDATE organizations SET name = $1 WHERE id = $2', [companyName, orgId]);
+      await client.query('UPDATE organizations SET name = $1 WHERE id = $2', [companyName, orgId]);
     }
 
-    await pool.query(
+    await client.query(
       `INSERT INTO organization_profiles
          (org_id, account_name, account_number, ifsc_code, upi_id, address, phone, email, terms, logo_data)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -82,12 +83,14 @@ router.put('/', authenticate, isAdmin, async (req: Request, res: Response) => {
       ]
     );
 
-    await pool.query('COMMIT');
+    await client.query('COMMIT');
 
     res.json({ success: true });
   } catch (error: any) {
-    await pool.query('ROLLBACK');
+    await client.query('ROLLBACK');
     res.status(500).json({ error: error.message || 'Failed to update settings' });
+  } finally {
+    client.release();
   }
 });
 

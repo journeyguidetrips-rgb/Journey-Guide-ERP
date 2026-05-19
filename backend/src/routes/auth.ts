@@ -70,13 +70,13 @@ function clearAuthCookies(res: Response): void {
 // Register new user
 router.post('/register', authLimiter, async (req: Request, res: Response) => {
   try {
-    const { email, password, firstName, lastName, roleId } = req.body;
+    const { email, password, firstName, lastName, roleId, orgId } = req.body;
 
     if (!email || !password || !firstName || !lastName) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const user = await registerUser(email, password, firstName, lastName, roleId);
+    const user = await registerUser(email, password, firstName, lastName, roleId, orgId);
 
     if (!user) {
       return res.status(400).json({ error: 'Email already exists or registration failed' });
