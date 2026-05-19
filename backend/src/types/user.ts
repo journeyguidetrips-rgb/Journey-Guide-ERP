@@ -4,6 +4,7 @@ export interface User {
     first_name: string;
     last_name: string;
     role_id: number;
+    org_id: number;
     is_active: boolean;
     created_at: string;
   }
@@ -28,5 +29,6 @@ export interface User {
     id: number;
     email: string;
     role_id: number;
+    org_id: number;
     permissions: string[];
   }

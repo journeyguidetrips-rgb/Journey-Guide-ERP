@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
 import toast from 'react-hot-toast'
-import { useUserStore } from '../stores/userStore'
 import {
   fetchDashboardSummary,
   fetchBookings as fetchBookingsAPI,
@@ -17,8 +16,6 @@ import {
 } from '../types/finance'
 
 export const useFinance = () => {
-  const { token } = useUserStore()
-
   const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics | null>(null)
   const [bookings, setBookings] = useState<Booking[]>([])
   const [clientPayments, setClientPayments] = useState<ClientPayment[]>([])
@@ -36,14 +33,14 @@ export const useFinance = () => {
   const loadDashboard = useCallback(async () => {
     setDashboardLoading(true)
     try {
-      const { data } = await fetchDashboardSummary(token!)
+      const { data } = await fetchDashboardSummary()
       if (data.success) setDashboardMetrics(data.data)
     } catch {
       toast.error('Failed to load dashboard metrics')
     } finally {
       setDashboardLoading(false)
     }
-  }, [token])
+  }, [])
 
   const loadList = useCallback(async (
     endpoint: 'bookings' | 'client-payments' | 'vendor-payments',
@@ -62,15 +59,15 @@ export const useFinance = () => {
       let total = 0
 
       if (endpoint === 'bookings') {
-        const { data } = await fetchBookingsAPI(token!, params)
+        const { data } = await fetchBookingsAPI(params)
         newItems = data.bookings || []
         total = data.total ?? 0
       } else if (endpoint === 'client-payments') {
-        const { data } = await fetchClientPaymentsAPI(token!, params)
+        const { data } = await fetchClientPaymentsAPI(params)
         newItems = data.payments || []
         total = data.total ?? 0
       } else {
-        const { data } = await fetchVendorPaymentsAPI(token!, params)
+        const { data } = await fetchVendorPaymentsAPI(params)
         newItems = data.payments || []
         total = data.total ?? 0
       }
@@ -98,18 +95,18 @@ export const useFinance = () => {
       setLoading(false)
       fetchLock.current = false
     }
-  }, [token])
+  }, [])
 
   const loadBookingDetails = useCallback(async (bookingId: string) => {
     try {
-      const { data } = await fetchBookingDetailsAPI(token!, bookingId)
+      const { data } = await fetchBookingDetailsAPI(bookingId)
       setSelectedBooking(data)
       return data
     } catch {
       toast.error('Failed to fetch booking details')
       return null
     }
-  }, [token])
+  }, [])
 
   return {
     dashboardMetrics,

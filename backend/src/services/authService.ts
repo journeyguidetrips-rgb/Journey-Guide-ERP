@@ -9,7 +9,9 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set. Server cannot start without it.');
 }
 
-const JWT_EXPIRY = '24h';
+const JWT_EXPIRY = '15m';
+const REFRESH_SECRET = JWT_SECRET + '_refresh';
+const REFRESH_EXPIRY = '7d';
 
 // Hash password
 export const hashPassword = async (password: string): Promise<string> => {
@@ -21,12 +23,12 @@ export const comparePassword = async (password: string, hash: string): Promise<b
   return bcrypt.compare(password, hash);
 };
 
-// Generate JWT token
+// Generate short-lived access JWT token (15 min)
 export const generateToken = (payload: JWTPayload): string => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
 };
 
-// Verify JWT token
+// Verify access JWT token
 export const verifyToken = (token: string): JWTPayload | null => {
   try {
     return jwt.verify(token, JWT_SECRET) as JWTPayload;
@@ -35,12 +37,26 @@ export const verifyToken = (token: string): JWTPayload | null => {
   }
 };
 
+// Generate long-lived refresh token (7 days) — stores only userId
+export const generateRefreshToken = (userId: number): string => {
+  return jwt.sign({ userId }, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRY });
+};
+
+// Verify refresh token — returns userId or null
+export const verifyRefreshToken = (token: string): { userId: number } | null => {
+  try {
+    return jwt.verify(token, REFRESH_SECRET) as { userId: number };
+  } catch {
+    return null;
+  }
+};
+
 // Get user with permissions
 export const getUserWithPermissions = async (userId: number): Promise<UserWithRole | null> => {
   try {
     const query = `
-      SELECT 
-        u.id, u.email, u.first_name, u.last_name, u.role_id, u.is_active, u.created_at,
+      SELECT
+        u.id, u.email, u.first_name, u.last_name, u.role_id, u.org_id, u.is_active, u.created_at,
         r.name as role_name,
         COALESCE(ARRAY_AGG(p.name), ARRAY[]::text[]) as permissions
       FROM users u

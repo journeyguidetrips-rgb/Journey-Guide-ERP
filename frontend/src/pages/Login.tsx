@@ -32,12 +32,8 @@ export default function Login() {
       })
 
       if (response.data.success) {
-        // Store token and user
-        login(response.data.user, response.data.token)
-
-        // Set default axios header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`
-
+        // Token is stored in httpOnly cookie by the server; just save user info
+        login(response.data.user)
         toast.success(`Welcome, ${response.data.user.firstName}!`)
         navigate('/')
       }

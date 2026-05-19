@@ -1,15 +1,24 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
+import rateLimit from 'express-rate-limit';
 import { pool } from './database/connection';
+import { authenticate, setAuthStrategy } from './middleware/authMiddleware';
+import { JwtStrategy } from './auth/jwtStrategy';
 import authRoutes from './routes/auth';
 import itineraryRoutes from './routes/itineraries';
 import bookingsRoutes from './routes/bookings';
 import vendorRoutes from './routes/vendors';
+import settingsRoutes from './routes/settings';
 
 // Load environment variables
 dotenv.config();
+
+// Register auth strategy — swap this one line to change the auth mechanism (e.g. OAuthStrategy)
+setAuthStrategy(new JwtStrategy());
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
@@ -34,11 +43,41 @@ app.use(cors({
   credentials: true,
 }));
 
+app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// CSRF double-submit cookie protection:
+// Auth routes (/api/auth/*) are exempt — login/register/refresh have no cookie yet.
+// All other state-mutating requests must send the X-CSRF-Token header matching the csrf_token cookie.
+const csrfProtection = (req: Request, res: Response, next: NextFunction): void => {
+  const mutating = ['POST', 'PUT', 'DELETE', 'PATCH'];
+  if (!mutating.includes(req.method)) return next();
+
+  const cookieCsrf = req.cookies?.csrf_token as string | undefined;
+  const headerCsrf = req.headers['x-csrf-token'] as string | undefined;
+
+  if (!cookieCsrf || !headerCsrf || cookieCsrf !== headerCsrf) {
+    res.status(403).json({ error: 'Invalid or missing CSRF token' });
+    return;
+  }
+  next();
+};
+// Apply CSRF check to all /api routes that are NOT under /api/auth
+app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+  if (req.path.startsWith('/auth/')) return next();
+  csrfProtection(req, res, next);
+});
+
+// General API rate limiter — applied to all /api routes
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' },
+});
+app.use('/api', apiLimiter);
 
 // Request logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -98,6 +137,19 @@ app.use('/api/bookings', bookingsRoutes);
 
 // Vendor routes
 app.use('/api/vendors', vendorRoutes);
+
+// Settings routes (admin-only)
+app.use('/api/settings', settingsRoutes);
+
+// Authenticated file serving — replaces the removed public /uploads static route
+app.get('/api/files/:filename', authenticate, (req: Request, res: Response) => {
+  const filename = path.basename(req.params.filename); // strip any path traversal
+  const filePath = path.join(process.cwd(), 'uploads', filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+  res.sendFile(filePath);
+});
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

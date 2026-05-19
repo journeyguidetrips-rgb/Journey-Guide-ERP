@@ -1,10 +1,7 @@
-import { pool } from '../database/connection'
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { pool } from '../database/connection';
+import { getContext } from '../context/requestContext';
 
-// Get all itineraries for a user
 interface GetItinerariesFilters {
-  userId: number;
   page?: number;
   limit?: number;
   search?: string;
@@ -13,79 +10,79 @@ interface GetItinerariesFilters {
   date?: string;
 }
 
-// Configure this for conversion of md to html
-const execAsync = promisify(exec);
+/**
+ * Returns a WHERE condition and the first parameter value for data scoping.
+ * Admins (role_id=1) see all records within their org; staff see only their own.
+ */
+const scopeCondition = (roleId: number, userId: number, orgId: number): { condition: string; value: number } => {
+  if (roleId === 1) {
+    return { condition: 'org_id = $1', value: orgId };
+  }
+  return { condition: 'user_id = $1', value: userId };
+};
 
-// Create a new itinerary
 export const createItinerary = async (
-  userId: number,
   vendorName: string,
   clientName: string,
   content: string
 ) => {
+  const { userId, orgId } = getContext();
   const result = await pool.query(
-    `INSERT INTO itineraries (id, user_id, vendor_name, client_name, source_content, content, status)
-     VALUES (uuid_generate_v4(), $1, $2, $3, $4, $4, 'Draft')
+    `INSERT INTO itineraries (id, user_id, org_id, vendor_name, client_name, source_content, content, status)
+     VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $5, 'Draft')
      RETURNING *`,
-    [userId, vendorName, clientName, content]
+    [userId, orgId, vendorName, clientName, content]
   );
   return result.rows[0];
 };
 
-// Get a single itinerary by ID
 export const getItinerary = async (id: string) => {
+  const { userId, orgId, roleId } = getContext();
+  const { condition, value } = scopeCondition(roleId, userId, orgId);
   const result = await pool.query(
-    `SELECT * FROM itineraries WHERE id = $1`,
-    [id]
+    `SELECT * FROM itineraries WHERE id = $2 AND ${condition}`,
+    [value, id]
   );
   return result.rows[0];
 };
 
-// Update itinerary content + HTML
-export const updateItinerary = async (
-  id: string,
-  content: string,
-  template: string
-) => {
-  try {
-    const result = await pool.query(
-      `UPDATE itineraries
-       SET content = $2, updated_at = CURRENT_TIMESTAMP, html_content = $3
-       WHERE id = $1
-       RETURNING *`,
-      [id, content, template]
-    );
-    
-    return result.rows[0];
-  } catch (error: any) {
-    console.error('❌ Pandoc conversion failed:', error.message);
-    throw error;
-  }
+export const updateItinerary = async (id: string, content: string, template: string) => {
+  const { userId, orgId, roleId } = getContext();
+  const { condition, value } = scopeCondition(roleId, userId, orgId);
+  const result = await pool.query(
+    `UPDATE itineraries
+     SET content = $3, updated_at = CURRENT_TIMESTAMP, html_content = $4
+     WHERE id = $2 AND ${condition}
+     RETURNING *`,
+    [value, id, content, template]
+  );
+  return result.rows[0];
 };
 
-// Publish itinerary
 export const publishItinerary = async (id: string) => {
+  const { userId, orgId, roleId } = getContext();
+  const { condition, value } = scopeCondition(roleId, userId, orgId);
   const result = await pool.query(
     `UPDATE itineraries
      SET status = 'Published', updated_at = CURRENT_TIMESTAMP
-     WHERE id = $1
+     WHERE id = $2 AND ${condition}
      RETURNING *`,
-    [id]
+    [value, id]
   );
   return result.rows[0];
 };
 
-// Delete itinerary
 export const deleteItinerary = async (id: string) => {
+  const { userId, orgId, roleId } = getContext();
+  const { condition, value } = scopeCondition(roleId, userId, orgId);
   const result = await pool.query(
-    `DELETE FROM itineraries WHERE id = $1 RETURNING id`,
-    [id]
+    `DELETE FROM itineraries WHERE id = $2 AND ${condition} RETURNING id`,
+    [value, id]
   );
-  return result.rowCount > 0;
+  return (result.rowCount ?? 0) > 0;
 };
 
 export const getUserItineraries = async ({
-  userId,
   page = 1,
   limit = 10,
   search,
@@ -93,11 +90,12 @@ export const getUserItineraries = async ({
   status,
   date,
 }: GetItinerariesFilters) => {
+  const { userId, orgId, roleId } = getContext();
   const offset = (page - 1) * limit;
 
-  // 1️⃣ Build WHERE conditions & filter values
-  const conditions: string[] = ['user_id = $1'];
-  const filterValues: any[] = [userId];
+  const { condition, value } = scopeCondition(roleId, userId, orgId);
+  const conditions: string[] = [condition];
+  const filterValues: any[] = [value];
   let paramIndex = 2;
 
   if (search) {
@@ -123,17 +121,14 @@ export const getUserItineraries = async ({
 
   const whereClause = conditions.join(' AND ');
 
-  // 2️⃣ Data Query (needs LIMIT & OFFSET)
   const dataQuery = `
-    SELECT * FROM itineraries 
-    WHERE ${whereClause} 
-    ORDER BY created_at DESC 
+    SELECT * FROM itineraries
+    WHERE ${whereClause}
+    ORDER BY created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
   `;
-  const dataValues = [...filterValues, limit, offset];
-  const dataResult = await pool.query(dataQuery, dataValues);
+  const dataResult = await pool.query(dataQuery, [...filterValues, limit, offset]);
 
-  // 3️⃣ Count Query (ONLY needs filter values, NO pagination)
   const countQuery = `SELECT COUNT(*) FROM itineraries WHERE ${whereClause}`;
   const countResult = await pool.query(countQuery, filterValues);
   const total = parseInt(countResult.rows[0].count, 10);

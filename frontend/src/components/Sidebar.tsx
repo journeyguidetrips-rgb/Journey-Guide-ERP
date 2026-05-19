@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, CreditCard, MapPin, Palette, Tag, Archive, Building2 } from 'lucide-react'
+import { LayoutDashboard, CreditCard, MapPin, Palette, Tag, Archive, Building2, Settings } from 'lucide-react'
 import clsx from 'clsx'
 import { useUserStore } from '../stores/userStore'
 
@@ -11,14 +11,16 @@ const menuItems = [
   { path: '/watermark', label: 'Watermark', icon: Palette, permission: 'manage_watermarks' },
   { path: '/placards', label: 'Placards', icon: Tag, permission: 'manage_placards' },
   { path: '/logs', label: 'Logs', icon: Archive, permission: 'view_logs' },
+  { path: '/settings', label: 'Settings', icon: Settings, permission: null, adminOnly: true },
 ]
 
 export default function Sidebar() {
   const location = useLocation()
-  const { user, hasPermission, hasAnyPermission } = useUserStore()
+  const { user, hasPermission, hasAnyPermission, hasRole } = useUserStore()
 
   // Filter menu items based on user permissions
   const visibleMenuItems = menuItems.filter((item) => {
+    if (item.adminOnly) return hasRole('admin')
     if (!item.permission) return true
     // Check if user has any manage_* permission for view_* items
     if (item.permission.startsWith('view_')) {

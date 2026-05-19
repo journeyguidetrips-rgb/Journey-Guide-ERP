@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { ChevronDown, X } from 'lucide-react'
-import { useUserStore } from '../../stores/userStore'
 import { searchVendors } from '../../services/vendorService'
 import { Vendor } from '../../types/vendor'
 
@@ -17,7 +16,6 @@ export default function VendorAutocomplete({
   placeholder = 'Type at least 3 letters to search...',
   className = '',
 }: VendorAutocompleteProps) {
-  const { token } = useUserStore()
   const [inputValue, setInputValue] = useState(value)
   const [suggestions, setSuggestions] = useState<Vendor[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
@@ -55,7 +53,7 @@ export default function VendorAutocomplete({
       debounceRef.current = setTimeout(async () => {
         setLoading(true)
         try {
-          const { data } = await searchVendors(token!, text)
+          const { data } = await searchVendors(text)
           setSuggestions(data.vendors)
           setShowDropdown(data.vendors.length > 0)
         } catch {
@@ -65,7 +63,7 @@ export default function VendorAutocomplete({
         }
       }, 300)
     },
-    [token, onSelect]
+    [onSelect]
   )
 
   const handleSelect = (vendor: Vendor) => {

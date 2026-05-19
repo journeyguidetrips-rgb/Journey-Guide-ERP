@@ -9,8 +9,8 @@ export default function Navbar() {
   const { user, logout } = useUserStore()
   const [showDropdown, setShowDropdown] = useState(false)
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     toast.success('Logged out successfully')
     navigate('/login')
   }

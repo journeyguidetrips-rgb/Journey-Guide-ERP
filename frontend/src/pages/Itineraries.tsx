@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { Upload } from 'lucide-react'
-import { useUserStore } from '../stores/userStore'
 import { useItineraries } from '../hooks/useItineraries'
 import {
   uploadItinerary,
@@ -26,8 +25,6 @@ const DEFAULT_BOOKING_FORM = {
 }
 
 export default function Itineraries() {
-  const { token } = useUserStore()
-
   const {
     itineraries, loading, loadingMore, hasMore, hasMoreRef, fetchLock,
     filters, setFilters, applyFilters, resetFilters, refresh, fetchMore,
@@ -76,7 +73,7 @@ export default function Itineraries() {
     formData.append('vendorName', vendorName)
     formData.append('clientName', clientName)
     try {
-      const { data } = await uploadItinerary(token!, formData)
+      const { data } = await uploadItinerary(formData)
       if (data.success) {
         setSelectedItinerary(data.itinerary)
         setEditContent(data.itinerary.content)
@@ -107,7 +104,7 @@ export default function Itineraries() {
     formData.append('vendorName', vendorName)
     formData.append('clientName', clientName)
     try {
-      const { data } = await uploadItinerary(token!, formData)
+      const { data } = await uploadItinerary(formData)
       if (data.success) {
         setSelectedItinerary(data.itinerary)
         setEditContent(data.itinerary.content)
@@ -137,7 +134,7 @@ export default function Itineraries() {
   const handleSave = async () => {
     if (!selectedItinerary) return
     try {
-      const { data } = await updateItinerary(token!, selectedItinerary.id, editContent)
+      const { data } = await updateItinerary(selectedItinerary.id, editContent)
       if (data.success) {
         toast.success('Itinerary updated')
         setSelectedItinerary(data.itinerary)
@@ -151,7 +148,7 @@ export default function Itineraries() {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this itinerary?')) return
     try {
-      const { data } = await deleteItinerary(token!, id)
+      const { data } = await deleteItinerary(id)
       if (data.success) {
         toast.success('Itinerary deleted')
         refresh()
@@ -164,7 +161,7 @@ export default function Itineraries() {
   const handleExportPDF = async (id: string) => {
     try {
       toast.loading('Generating PDF...')
-      const response = await downloadPDF(token!, id)
+      const response = await downloadPDF(id)
 
       if (response.data.type !== 'application/pdf') {
         toast.dismiss()
@@ -181,7 +178,7 @@ export default function Itineraries() {
       link.remove()
       window.URL.revokeObjectURL(url)
 
-      const { data: publishData } = await publishItinerary(token!, id)
+      const { data: publishData } = await publishItinerary(id)
       toast.dismiss()
       if (publishData.success) {
         toast.success('Download complete & itinerary published!')
@@ -216,7 +213,7 @@ export default function Itineraries() {
         guests: parseInt(bookingForm.guests) || 1,
         notes: bookingForm.notes,
       }
-      const { data } = await convertToBooking(token!, payload)
+      const { data } = await convertToBooking(payload)
       toast.dismiss()
       if ('success' in data && data.success) {
         toast.success('Converted to booking!')
@@ -236,7 +233,7 @@ export default function Itineraries() {
     if (!window.confirm('Restore to "Published" status? All payment records will be deleted.')) return
     try {
       toast.loading('Restoring itinerary...')
-      const { data } = await revertToPublished(token!, itinerary.id)
+      const { data } = await revertToPublished(itinerary.id)
       toast.dismiss()
       if (data.success) {
         toast.success('Restored to Published')

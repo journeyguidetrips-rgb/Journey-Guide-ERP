@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import axios from 'axios'
+import { Loader } from 'lucide-react'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -12,21 +12,26 @@ import Watermark from './pages/Watermark'
 import Placards from './pages/Placards'
 import Logs from './pages/Logs'
 import Vendors from './pages/Vendors'
+import Settings from './pages/Settings'
 import { Toaster } from 'react-hot-toast'
 import { useUserStore } from './stores/userStore'
 
 function App() {
-  const { loadFromStorage, isAuthenticated, token } = useUserStore()
+  const { loadFromStorage, isAuthenticated, isLoading } = useUserStore()
 
-  // Load user from storage and set axios defaults
+  // On mount, call /api/auth/me to rehydrate user state from httpOnly cookie
   useEffect(() => {
     loadFromStorage()
-    
-    const storedToken = localStorage.getItem('token')
-    if (storedToken) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
-    }
   }, [loadFromStorage])
+
+  // Prevent flashing login page while the /me request is in flight
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <Loader size={32} className="animate-spin text-blue-600" />
+      </div>
+    )
+  }
 
   return (
     <Router>
@@ -83,6 +88,14 @@ function App() {
                   element={
                     <ProtectedRoute requiredPermissions={['view_logs']}>
                       <Logs />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute requiredRoles={['admin']}>
+                      <Settings />
                     </ProtectedRoute>
                   }
                 />

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Phone, Mail, MapPin, Users, X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useUserStore } from '../stores/userStore'
 import { fetchVendors, createVendor, updateVendor, deleteVendor } from '../services/vendorService'
 import { Vendor, VendorContact } from '../types/vendor'
 
@@ -26,7 +25,6 @@ const DEFAULT_FORM: VendorForm = {
 }
 
 export default function Vendors() {
-  const { token } = useUserStore()
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -37,7 +35,7 @@ export default function Vendors() {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await fetchVendors(token!)
+      const { data } = await fetchVendors()
       setVendors(data.vendors)
     } catch {
       toast.error('Failed to load vendors')
@@ -72,7 +70,7 @@ export default function Vendors() {
   const handleDelete = async (vendor: Vendor) => {
     if (!window.confirm(`Delete vendor "${vendor.name}"? This cannot be undone.`)) return
     try {
-      await deleteVendor(token!, vendor.id)
+      await deleteVendor(vendor.id)
       toast.success('Vendor deleted')
       load()
     } catch {
@@ -108,10 +106,10 @@ export default function Vendors() {
         contacts: validContacts,
       }
       if (editingVendor) {
-        await updateVendor(token!, editingVendor.id, payload)
+        await updateVendor(editingVendor.id, payload)
         toast.success('Vendor updated')
       } else {
-        await createVendor(token!, payload)
+        await createVendor(payload)
         toast.success('Vendor added')
       }
       setShowModal(false)

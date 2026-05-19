@@ -1,4 +1,4 @@
-import axios from 'axios'
+import { api } from './api'
 import {
   Booking,
   ClientPayment,
@@ -9,78 +9,51 @@ import {
   VendorPaymentForm,
 } from '../types/finance'
 
-const api = axios.create({ baseURL: '/api' })
+export const fetchDashboardSummary = () =>
+  api.get<{ success: boolean; data: DashboardMetrics }>('/bookings/dashboard-summary')
 
-const authHeader = (token: string) => ({ Authorization: `Bearer ${token}` })
+export const fetchBookings = (params: URLSearchParams) =>
+  api.get<{ bookings: Booking[]; total: number }>(`/bookings?${params}`)
 
-export const fetchDashboardSummary = (token: string) =>
-  api.get<{ success: boolean; data: DashboardMetrics }>('/bookings/dashboard-summary', {
-    headers: authHeader(token),
-  })
+export const fetchBookingDetails = (bookingId: string) =>
+  api.get<BookingWithPayments>(`/bookings/${bookingId}`)
 
-export const fetchBookings = (token: string, params: URLSearchParams) =>
-  api.get<{ bookings: Booking[]; total: number }>(`/bookings?${params}`, {
-    headers: authHeader(token),
-  })
+export const fetchClientPayments = (params: URLSearchParams) =>
+  api.get<{ payments: ClientPayment[]; total: number }>(`/bookings/client-payments?${params}`)
 
-export const fetchBookingDetails = (token: string, bookingId: string) =>
-  api.get<BookingWithPayments>(`/bookings/${bookingId}`, {
-    headers: authHeader(token),
-  })
-
-export const fetchClientPayments = (token: string, params: URLSearchParams) =>
-  api.get<{ payments: ClientPayment[]; total: number }>(`/bookings/client-payments?${params}`, {
-    headers: authHeader(token),
-  })
-
-export const fetchVendorPayments = (token: string, params: URLSearchParams) =>
-  api.get<{ payments: VendorPayment[]; total: number }>(`/bookings/vendor-payments?${params}`, {
-    headers: authHeader(token),
-  })
+export const fetchVendorPayments = (params: URLSearchParams) =>
+  api.get<{ payments: VendorPayment[]; total: number }>(`/bookings/vendor-payments?${params}`)
 
 export const postClientPayment = (
-  token: string,
   bookingId: string,
   payload: Omit<PaymentForm, 'bookingId'> & { amount: number }
 ) =>
-  api.post(`/bookings/${bookingId}/client-payments`, payload, {
-    headers: authHeader(token),
-  })
+  api.post(`/bookings/${bookingId}/client-payments`, payload)
 
 export const postVendorPayment = (
-  token: string,
   bookingId: string,
   payload: Omit<VendorPaymentForm, 'bookingId'> & { amountPaid: number }
 ) =>
-  api.post(`/bookings/${bookingId}/vendor-payments`, payload, {
-    headers: authHeader(token),
-  })
+  api.post(`/bookings/${bookingId}/vendor-payments`, payload)
 
-export const patchBooking = (token: string, bookingId: string, data: Record<string, unknown>) =>
-  api.put(`/bookings/${bookingId}`, data, { headers: authHeader(token) })
+export const patchBooking = (bookingId: string, data: Record<string, unknown>) =>
+  api.put(`/bookings/${bookingId}`, data)
 
 export const patchClientPayment = (
-  token: string,
   bookingId: string,
   paymentId: number,
   data: Record<string, unknown>
 ) =>
-  api.put(`/bookings/${bookingId}/client-payments/${paymentId}`, data, { headers: authHeader(token) })
+  api.put(`/bookings/${bookingId}/client-payments/${paymentId}`, data)
 
 export const patchVendorPayment = (
-  token: string,
   bookingId: string,
   paymentId: number,
   data: Record<string, unknown>
 ) =>
-  api.put(`/bookings/${bookingId}/vendor-payments/${paymentId}`, data, { headers: authHeader(token) })
+  api.put(`/bookings/${bookingId}/vendor-payments/${paymentId}`, data)
 
-export const downloadPaymentReceipt = (
-  token: string,
-  bookingId: string,
-  paymentId: number
-) =>
+export const downloadPaymentReceipt = (bookingId: string, paymentId: number) =>
   api.get<Blob>(`/bookings/${bookingId}/client-payments/${paymentId}/receipt`, {
-    headers: authHeader(token),
     responseType: 'blob',
   })

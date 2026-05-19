@@ -1,21 +1,17 @@
 import { useEffect, useState } from 'react'
 import { CreditCard, FileText, Image, Tag, Archive, TrendingUp } from 'lucide-react'
-import axios from 'axios'
-import { useUserStore } from '../stores/userStore'
+import { api } from '../services/api'
 import { DashboardMetrics } from '../types/finance'
 
 
 export default function Dashboard() {
-  const { token } = useUserStore()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
-        const { data } = await axios.get('/api/bookings/dashboard-summary', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const { data } = await api.get('/bookings/dashboard-summary')
         if (data.success) setMetrics(data.data)
       } catch (error) {
         console.error('Failed to load dashboard metrics:', error)
@@ -24,7 +20,7 @@ export default function Dashboard() {
       }
     }
     fetchMetrics()
-  }, [token])
+  }, [])
 
   const stats = [
     { label: 'Total Bookings', value: metrics?.total_bookings ?? 0, icon: CreditCard, color: 'bg-blue-500' },

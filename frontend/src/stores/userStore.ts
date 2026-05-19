@@ -1,84 +1,87 @@
-import { create } from 'zustand';
+import axios from 'axios'
+import { create } from 'zustand'
 
 export interface User {
-  id: number;
-  email: string;
-  firstName: string;
-  lastName: string;
-  roleName: string;
-  permissions: string[];
+  id: number
+  email: string
+  firstName: string
+  lastName: string
+  roleName: string
+  permissions: string[]
 }
 
 export interface UserState {
-  user: User | null;
-  token: string | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  
+  user: User | null
+  isLoading: boolean
+  isAuthenticated: boolean
+
   // Actions
-  login: (user: User, token: string) => void;
-  logout: () => void;
-  setLoading: (loading: boolean) => void;
-  loadFromStorage: () => void;
-  hasPermission: (permission: string) => boolean;
-  hasRole: (role: string) => boolean;
-  hasAnyRole: (roles: string[]) => boolean;
-  hasAnyPermission: (permissions: string[]) => boolean;
+  login: (user: User) => void
+  logout: () => Promise<void>
+  /** Clears auth state locally without calling the server (used on refresh failure). */
+  clearAuth: () => void
+  /** Called once on app mount — fetches /api/auth/me to rehydrate from httpOnly cookie. */
+  loadFromStorage: () => Promise<void>
+  hasPermission: (permission: string) => boolean
+  hasRole: (role: string) => boolean
+  hasAnyRole: (roles: string[]) => boolean
+  hasAnyPermission: (permissions: string[]) => boolean
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
   user: null,
-  token: null,
-  isLoading: false,
+  // Start as loading so the app doesn't flash the login page during the /me check
+  isLoading: true,
   isAuthenticated: false,
 
-  login: (user: User, token: string) => {
-    localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('token', token);
-    set({ user, token, isAuthenticated: true });
+  login: (user: User) => {
+    set({ user, isAuthenticated: true })
   },
 
-  logout: () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    set({ user: null, token: null, isAuthenticated: false });
-  },
-
-  setLoading: (loading: boolean) => {
-    set({ isLoading: loading });
-  },
-
-  loadFromStorage: () => {
+  logout: async () => {
     try {
-      const storedUser = localStorage.getItem('user');
-      const storedToken = localStorage.getItem('token');
+      await axios.post('/api/auth/logout', {}, { withCredentials: true })
+    } catch {
+      // Ignore — cookies are cleared server-side; we clear client state regardless
+    }
+    set({ user: null, isAuthenticated: false })
+  },
 
-      if (storedUser && storedToken) {
-        const user = JSON.parse(storedUser);
-        set({ user, token: storedToken, isAuthenticated: true });
+  clearAuth: () => {
+    set({ user: null, isAuthenticated: false })
+  },
+
+  loadFromStorage: async () => {
+    try {
+      const { data } = await axios.get('/api/auth/me', { withCredentials: true })
+      if (data.success) {
+        set({ user: data.user, isAuthenticated: true, isLoading: false })
+      } else {
+        set({ isLoading: false })
       }
-    } catch (error) {
-      console.error('Error loading user from storage:', error);
+    } catch {
+      // No valid session cookie — user must log in
+      set({ isLoading: false })
     }
   },
 
   hasPermission: (permission: string) => {
-    const { user } = get();
-    return user?.permissions?.includes(permission) || false;
+    const { user } = get()
+    return user?.permissions?.includes(permission) || false
   },
 
   hasRole: (role: string) => {
-    const { user } = get();
-    return user?.roleName?.toLowerCase() === role.toLowerCase();
+    const { user } = get()
+    return user?.roleName?.toLowerCase() === role.toLowerCase()
   },
 
   hasAnyRole: (roles: string[]) => {
-    const { user } = get();
-    return roles.some((role) => user?.roleName?.toLowerCase() === role.toLowerCase());
+    const { user } = get()
+    return roles.some(role => user?.roleName?.toLowerCase() === role.toLowerCase())
   },
 
   hasAnyPermission: (permissions: string[]) => {
-    const { user } = get();
-    return permissions.some((permission) => user?.permissions?.includes(permission));
+    const { user } = get()
+    return permissions.some(permission => user?.permissions?.includes(permission))
   },
-}));
+}))

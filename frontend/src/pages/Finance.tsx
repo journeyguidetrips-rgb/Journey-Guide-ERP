@@ -6,7 +6,6 @@ import {
   postClientPayment, postVendorPayment, downloadPaymentReceipt,
   patchBooking, patchClientPayment, patchVendorPayment,
 } from '../services/bookingService'
-import { useUserStore } from '../stores/userStore'
 import { TabView, PaymentForm, VendorPaymentForm, Booking, ClientPayment, VendorPayment } from '../types/finance'
 import DashboardTab from '../components/finance/DashboardTab'
 import BookingsTab from '../components/finance/BookingsTab'
@@ -38,8 +37,6 @@ const DEFAULT_VENDOR_FORM: VendorPaymentForm = {
 }
 
 export default function Finance() {
-  const { token } = useUserStore()
-
   const {
     dashboardMetrics, dashboardLoading, loadDashboard,
     bookings, bookingsLoading,
@@ -91,7 +88,7 @@ export default function Finance() {
   const handleDownloadReceipt = useCallback(async (paymentId: number, bookingId: string) => {
     const toastId = toast.loading('Generating receipt PDF...')
     try {
-      const response = await downloadPaymentReceipt(token!, bookingId, paymentId)
+      const response = await downloadPaymentReceipt(bookingId, paymentId)
       const blob = new Blob([response.data as unknown as BlobPart], { type: 'application/pdf' })
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -105,7 +102,7 @@ export default function Finance() {
     } catch {
       toast.error('Failed to generate receipt', { id: toastId })
     }
-  }, [token])
+  }, [])
 
   const handleAddVendorPayment = useCallback((booking: Booking) => {
     setVendorForm(prev => ({
@@ -125,7 +122,7 @@ export default function Finance() {
     }
     setSaving(true)
     try {
-      await postClientPayment(token!, clientForm.bookingId, {
+      await postClientPayment(clientForm.bookingId, {
         ...clientForm,
         amount: parseFloat(clientForm.amount),
       })
@@ -150,7 +147,7 @@ export default function Finance() {
     }
     setSaving(true)
     try {
-      await postVendorPayment(token!, vendorForm.bookingId, {
+      await postVendorPayment(vendorForm.bookingId, {
         ...vendorForm,
         amountPaid: parseFloat(vendorForm.amountPaid),
       })
@@ -175,7 +172,7 @@ export default function Finance() {
   }, [])
 
   const handleUpdateBooking = useCallback(async (bookingId: string, data: Partial<Booking>) => {
-    await patchBooking(token!, bookingId, {
+    await patchBooking(bookingId, {
       clientName:   (data as any).client_name,
       vendorName:   (data as any).vendor_name,
       phone:        (data as any).phone,
@@ -195,7 +192,7 @@ export default function Finance() {
     if (selectedBooking?.booking.booking_id === bookingId) {
       loadBookingDetails(bookingId)
     }
-  }, [token, loadBookings, loadBookingDetails, selectedBooking])
+  }, [loadBookings, loadBookingDetails, selectedBooking])
 
   const handleSavePaymentEdit = useCallback(async (
     paymentId: number,
@@ -203,9 +200,9 @@ export default function Finance() {
     data: Record<string, unknown>
   ) => {
     if (isClientPayment) {
-      await patchClientPayment(token!, bookingId, paymentId, data)
+      await patchClientPayment(bookingId, paymentId, data)
     } else {
-      await patchVendorPayment(token!, bookingId, paymentId, data)
+      await patchVendorPayment(bookingId, paymentId, data)
     }
     toast.success('Payment updated!')
     setShowPaymentDetail(false)
@@ -219,7 +216,7 @@ export default function Finance() {
     if (selectedBooking?.booking.booking_id === bookingId) {
       loadBookingDetails(bookingId)
     }
-  }, [token, isClientPayment, loadClientPayments, loadVendorPayments, loadBookingDetails, selectedBooking])
+  }, [isClientPayment, loadClientPayments, loadVendorPayments, loadBookingDetails, selectedBooking])
 
   const exportToCSV = (type: 'bookings' | 'client' | 'vendor') => {
     const rows = {

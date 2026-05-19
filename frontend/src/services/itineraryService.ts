@@ -1,38 +1,29 @@
-import axios from 'axios'
+import { api } from './api'
 import { Itinerary } from '../types/itinerary'
 import { ConvertToBookingRequest } from '../types/booking'
 
-const api = axios.create({ baseURL: '/api' })
+export const fetchItineraries = (params: URLSearchParams) =>
+  api.get<{ itineraries: Itinerary[]; total: number }>(`/itineraries?${params}`)
 
-const authHeader = (token: string) => ({ Authorization: `Bearer ${token}` })
-
-export const fetchItineraries = (token: string, params: URLSearchParams) =>
-  api.get<{ itineraries: Itinerary[]; total: number }>(`/itineraries?${params}`, {
-    headers: authHeader(token),
-  })
-
-export const uploadItinerary = (token: string, formData: FormData) =>
+export const uploadItinerary = (formData: FormData) =>
   api.post('/itineraries/upload', formData, {
-    headers: { ...authHeader(token), 'Content-Type': 'multipart/form-data' },
+    headers: { 'Content-Type': 'multipart/form-data' },
   })
 
-export const updateItinerary = (token: string, id: string, content: string) =>
-  api.put(`/itineraries/${id}`, { content }, { headers: authHeader(token) })
+export const updateItinerary = (id: string, content: string) =>
+  api.put(`/itineraries/${id}`, { content })
 
-export const deleteItinerary = (token: string, id: string) =>
-  api.delete(`/itineraries/${id}`, { headers: authHeader(token) })
+export const deleteItinerary = (id: string) =>
+  api.delete(`/itineraries/${id}`)
 
-export const downloadPDF = (token: string, id: string) =>
-  api.get(`/itineraries/${id}/download-pdf`, {
-    headers: authHeader(token),
-    responseType: 'blob',
-  })
+export const downloadPDF = (id: string) =>
+  api.get(`/itineraries/${id}/download-pdf`, { responseType: 'blob' })
 
-export const publishItinerary = (token: string, id: string) =>
-  api.post(`/itineraries/${id}/publish`, {}, { headers: authHeader(token) })
+export const publishItinerary = (id: string) =>
+  api.post(`/itineraries/${id}/publish`, {})
 
-export const convertToBooking = (token: string, payload: ConvertToBookingRequest) =>
-  api.post('/bookings/convert', payload, { headers: authHeader(token) })
+export const convertToBooking = (payload: ConvertToBookingRequest) =>
+  api.post('/bookings/convert', payload)
 
-export const revertToPublished = (token: string, itineraryId: string) =>
-  api.post(`/bookings/${itineraryId}/revert`, {}, { headers: authHeader(token) })
+export const revertToPublished = (itineraryId: string) =>
+  api.post(`/bookings/${itineraryId}/revert`, {})

@@ -1,14 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { useUserStore } from '../stores/userStore'
 import { fetchItineraries as fetchItinerariesAPI } from '../services/itineraryService'
 import { Itinerary, ItineraryFilters } from '../types/itinerary'
 
 const DEFAULT_FILTERS: ItineraryFilters = { query: '', vendorName: '', status: '', date: '' }
 
 export const useItineraries = () => {
-  const { token } = useUserStore()
-
   const [itineraries, setItineraries] = useState<Itinerary[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -43,7 +40,7 @@ export const useItineraries = () => {
         ...(f.date && { date: f.date }),
       })
 
-      const { data } = await fetchItinerariesAPI(token!, params)
+      const { data } = await fetchItinerariesAPI(params)
       const newItems = data.itineraries || []
       const total = data.total ?? 0
 
@@ -66,7 +63,7 @@ export const useItineraries = () => {
       setIsLoading(false)
       fetchLock.current = false
     }
-  }, [token])
+  }, [])
 
   const applyFilters = useCallback(() => {
     filtersRef.current = { ...filters }
