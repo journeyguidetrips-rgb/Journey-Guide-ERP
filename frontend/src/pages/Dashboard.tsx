@@ -26,7 +26,7 @@ export default function Dashboard() {
     { label: 'Total Bookings', value: metrics?.total_bookings ?? 0, icon: CreditCard, color: 'bg-blue-500' },
     { label: 'Itineraries', value: metrics?.total_itineraries ?? 0, icon: FileText, color: 'bg-green-500' },
     { label: 'Revenue (Selling)', value: `₹${(metrics?.total_selling_price ?? 0).toLocaleString()}`, icon: TrendingUp,  color: 'bg-indigo-500' },
-    { label: 'Received from Client', value: `₹${(metrics?.total_received_from_client ?? 0).toLocaleString()}`, icon: Image, color: 'bg-purple-500' },
+    { label: 'Received from Client', value: `₹${(metrics?.total_received ?? 0).toLocaleString()}`, icon: Image, color: 'bg-purple-500' },
     { label: 'Vendor Cost', value: `₹${(metrics?.total_vendor_cost ?? 0).toLocaleString()}`, icon: Tag, color: 'bg-orange-500' },
     { label: 'Paid to Vendor', value: `₹${(metrics?.total_paid_to_vendor ?? 0).toLocaleString()}`, icon: Archive, color: 'bg-red-500' },
   ]
@@ -62,23 +62,6 @@ export default function Dashboard() {
           })}
         </div>
       )}
-
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="space-y-2">
-            <button className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
-              + New Payment
-            </button>
-            <button className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition">
-              + New Itinerary
-            </button>
-            <button className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition">
-              + Create Watermark
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

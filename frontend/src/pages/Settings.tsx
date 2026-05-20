@@ -23,6 +23,7 @@ export default function Settings() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    console.log("Settings component mounted");
     fetchSettings()
       .then(setForm)
       .catch(() => toast.error('Failed to load settings'))

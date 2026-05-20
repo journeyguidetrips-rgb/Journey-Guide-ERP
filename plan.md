@@ -1,496 +1,133 @@
-## Architectural Plan: Journey Guide ERP — Multi-Client Ready
+## Validation Report: Journey Guide ERP Restructure
 
-After reading every layer of the codebase, here are the problems grouped by severity and the complete plan to fix them.
+### What's Completed ✅
 
----
+All phases from the plan were substantially implemented:
 
-# What's Actually Wrong Right Now
-
-## 1. Broken multi-tenancy — the biggest issue
-
-The current ownership model is incomplete. Data isolation only works for itineraries. Everything downstream is broken:
-
-* `getBookingWithPayments`, `addClientPayment`, `addVendorPayment`, `getBookingDetails` — all accept a raw `bookingId` with no user ownership check. Any authenticated user can read or write to any booking if they know the UUID.
-* `getDashboardSummary()` calls `get_dashboard_summary()` with no user filter — it returns numbers from all data in the database.
-* `publishItinerary`, `deleteItinerary`, `getItinerary` (single fetch) — no user check in the service layer.
-* The receipt route (`/:bookingId/client-payments/:paymentId/receipt`) directly queries `pool` with no ownership verification.
-* `updateClientPayment` and `updateVendorPayment` — no user check, anyone can edit any payment.
-
----
-
-## 2. Hardcoded client-specific data
-
-In `backend/src/routes/bookings.ts` lines `491–496`, the receipt template hardcodes:
-
-```text
-Account Name: Journey Guide
-Account No:   18480200006512
-IFSC Code:    Fdrl0001848
-UPI ID:       journeyguide64@fbl
-```
-
-This makes the system impossible to deploy for any other agency as-is.
+| Phase | Item | Status |
+|---|---|---|
+| 1.1 | Ownership checks on all booking/payment endpoints | ✅ Done via `ownershipCheck` + `itineraryScopeCondition` helpers |
+| 1.2 | Per-user/org dashboard | ✅ `get_dashboard_summary(userId, orgId, isAdmin)` |
+| 1.3 | Payment query paramIndex bug fix | ✅ paramIndex starts at 2 |
+| 1.4 | Rate limiting | ✅ authLimiter (10/15min) + apiLimiter (200/min) |
+| 1.5 | Protected uploads | ✅ `/api/files/:filename` with `authenticate` |
+| 2.x | Multi-tenancy (orgs, JWT org_id, admin/staff scoping) | ✅ Full implementation |
+| 3.1 | Receipt reads from `organization_profiles` | ✅ Done in `pdfService.ts` |
+| 3.2 | Agency Settings page | ✅ `frontend/src/pages/Settings.tsx` |
+| 4.1 | PDF extraction to `pdfService.ts` | ✅ Done |
+| 4.2 | Utility functions centralized | ✅ `utils/formatters.ts` |
+| 4.3 | Zod validation middleware | ✅ `validateRequest` + schemas |
+| 5.1 | httpOnly cookie JWT | ✅ Done, fallback to Bearer for Postman |
+| 5.2 | Refresh token (15min/7day) | ✅ Done |
+| 5.3 | Centralized Axios interceptors (401/403/500) | ✅ `frontend/src/services/api.ts` |
 
 ---
 
-## 3. No concept of an organization/tenant
+### Bugs & Gaps Found ❌
 
-Currently the model is:
+#### 1. **Phase 1.6 — Not Done: No proper logger**
+`console.log` is still used throughout — `index.ts`, `itineraries.ts`, `authService.ts`, etc. The plan called for `pino` or `winston` with `LOG_LEVEL=error` in production. This is the only full phase item that was skipped.
 
-```text
-user → data
-```
+#### 2. **Critical — Missing migration: `organizations` and `organization_profiles` tables never created**
+`add_vendors.sql` creates `vendors`/`vendor_contacts` only. `phase2_multi_tenancy.sql` **inserts into** `organizations` and `organization_profiles` but never **creates** them. The `ALTER TABLE` statements from the plan (adding `org_id` FK columns to `users`, `itineraries`, `vendors`) are also absent. The migrations will fail on a fresh database.
 
-For a real agency, it needs to be:
+#### 3. **Critical — `registerUser` doesn't assign `org_id`**
+`authService.ts:109` — the INSERT into `users` omits `org_id`. New users get `null`, which means their JWT payload has `org_id: undefined`, breaking the admin org-scoping. Fix: the register endpoint needs to accept an `org_id` or default to a specific org.
 
-```text
-organization → users → data
-```
+#### 4. **Bug — `generateReceiptPDF` ignores admin/org scope**
+`pdfService.ts:46–52` uses `i.user_id = $2` (staff-only check) instead of the role-aware `itineraryScopeCondition`. An admin user cannot generate a receipt for a booking created by their staff — they'll get "Booking not found".
 
-A manager and a staff member at the same agency need to share data; two different agencies must never share data.
+#### 5. **Bug — `settings.ts` transaction is unsafe**
+`settings.ts:51–85` calls `pool.query('BEGIN')` / `pool.query('COMMIT')` directly on the pool. The pool can dispatch each query to a different connection, so `BEGIN` and `COMMIT` may not wrap the same transaction. It must use a dedicated `pool.connect()` client, like every other transactional service does.
 
----
-
-## 4. Business logic scattered in route files
-
-`bookings.ts` (the route file) contains:
-
-* utility functions (`formatIndian`, `numberToWords`, `displayDate`)
-* HTML template building
-* Puppeteer PDF generation
-* direct `pool.query` calls
-
-—all mixed together. This is what makes small changes require touching many files.
+#### 6. **Itinerary HTML title is hardcoded**
+`itineraries.ts:156` — `.replace('{{title}}', 'Journey Guide')`. The company name should come from `organization_profiles`, just like the receipt does.
 
 ---
 
-## 5. Security gaps
+### Design Pattern Suggestions for ERP Architecture
 
-* No rate limiting on any endpoint (login endpoint is completely open to brute force)
-* JWT stored in `localStorage` (vulnerable to XSS)
-* No request body validation library — manual field checks scattered across all routes
-* Debug `console.log` with user data in production code (`console.log("Reterived booking details")`, `console.log("In 'Get Payments' method")`, etc.)
-* Static file serving from `uploads/` with no auth — any file URL is publicly accessible
+The code is already clean (thin routes → services → DB), but ERP systems have additional requirements. Here's what would make this production-grade:
 
----
+#### 1. **Custom Error Classes (Domain Errors)**
 
-## 6. Query fragility
-
-`getClientPayments` and `getVendorPayments` have a subtle parameter index bug — `$1` is reserved for `userId` but then `paramIndex` starts at `1` too, causing wrong parameter binding when filters are applied.
-
-The `userId` filter is also never actually applied in the `WHERE` clause of those queries (the `JOIN` exists but `i.user_id = $1` is missing from the conditions array).
-
----
-
-# The Plan (Phased)
-
----
-
-# Phase 1 — Fix Security Holes (Do This Before Any Deployment)
-
-## 1.1 — Patch ownership checks on all endpoints
-
-Every service function that touches bookings or payments must accept and enforce `userId`.
-
-The pattern to use everywhere:
-
-```sql
--- Before accessing/modifying any booking, always validate:
-SELECT b.booking_id FROM bookings b
-INNER JOIN itineraries i ON b.itinerary_id = i.id
-WHERE b.booking_id = $1 AND i.user_id = $2
-```
-
-### Files to update
-
-* `bookingService.ts`
-
-  * `getBookingWithPayments`
-  * `addClientPayment`
-  * `addVendorPayment`
-  * `getBookingDetails`
-  * `updateClientPayment`
-  * `updateVendorPayment`
-
-* `routes/bookings.ts`
-
-  * pass `req.user!.id` to every service call, including the receipt route
-
-* `itineraryService.ts`
-
-  * check `publishItinerary`
-  * `deleteItinerary`
-  * `getItinerary`
-  * all scope to `userId`
-
----
-
-## 1.2 — Fix the dashboard to be per-user
-
-The PostgreSQL function `get_dashboard_summary()` needs to accept a `user_id` parameter:
-
-```sql
--- Change the DB function signature:
-CREATE OR REPLACE FUNCTION get_dashboard_summary(p_user_id INT)
-RETURNS TABLE(...) AS $$
-  -- all queries filter by:
-  INNER JOIN itineraries i ON b.itinerary_id = i.id
-  WHERE i.user_id = p_user_id
-$$ LANGUAGE sql;
-```
-
-Then:
-
-* `bookingService.getDashboardSummary(userId)` passes it down
-* the route passes `req.user!.id`
-
----
-
-## 1.3 — Fix the payments query bug
-
-In `getClientPayments` and `getVendorPayments`:
-
-* add `i.user_id = $1` as the first condition
-* fix `paramIndex` to start at `2` after reserving `$1` for `userId`
-
----
-
-## 1.4 — Add rate limiting
-
-Install `express-rate-limit` and apply it:
-
-* Strict limit on `/api/auth/login`
-
-  * e.g., `10 requests per 15 minutes per IP`
-
-* General API limit on all `/api/*` routes
-
-  * e.g., `200 requests per minute per user`
-
----
-
-## 1.5 — Protect the uploads directory
-
-Remove:
+Currently every service throws `new Error('Booking not found')` and every route catches it generically. Define error types:
 
 ```ts
-app.use('/uploads', express.static(...))
-```
-
-from `index.ts`.
-
-Files should only be served through an authenticated route:
-
-```http
-GET /api/files/:filename
-→ authenticate middleware
-→ stream file from disk
-```
-
----
-
-## 1.6 — Remove all debug console.log calls
-
-Replace with a proper logger (e.g., `pino` or `winston`) that can be silenced in production via:
-
-```env
-LOG_LEVEL=error
-```
-
----
-
-# Phase 2 — Multi-Tenancy Architecture (Organizations)
-
-This is what makes it usable across clients.
-
----
-
-## 2.1 — Add an organizations table
-
-```sql
-CREATE TABLE organizations (
-  id           SERIAL PRIMARY KEY,
-  name         VARCHAR(255) NOT NULL,
-  slug         VARCHAR(100) UNIQUE NOT NULL,
-  is_active    BOOLEAN DEFAULT true,
-  created_at   TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE organization_profiles (
-  org_id          INTEGER PRIMARY KEY REFERENCES organizations(id),
-  logo_base64     TEXT,
-  account_name    VARCHAR(255),
-  account_number  VARCHAR(50),
-  ifsc_code       VARCHAR(20),
-  upi_id          VARCHAR(100),
-  address         TEXT,
-  phone           VARCHAR(20),
-  email           VARCHAR(255),
-  terms           TEXT,
-  updated_at      TIMESTAMP DEFAULT NOW()
-);
-```
-
----
-
-## 2.2 — Add organization_id to the data tables
-
-```sql
-ALTER TABLE users       ADD COLUMN org_id INTEGER REFERENCES organizations(id);
-ALTER TABLE itineraries ADD COLUMN org_id INTEGER REFERENCES organizations(id);
-ALTER TABLE vendors     ADD COLUMN org_id INTEGER REFERENCES organizations(id);
-```
-
-`bookings` inherits org via itinerary join, so no column is needed.
-
----
-
-## 2.3 — Update the JWT payload
-
-```ts
-interface JWTPayload {
-  id: number;
-  email: string;
-  role_id: number;
-  org_id: number;
-  permissions: string[];
+// src/errors/domainErrors.ts
+export class NotFoundError extends Error {
+  constructor(entity: string) { super(`${entity} not found`); this.name = 'NotFoundError'; }
 }
+export class ForbiddenError extends Error { ... }
+export class ValidationError extends Error { ... }
 ```
 
-Every query then filters by both:
+Then in routes, map error types to HTTP status codes in the error middleware — instead of every route handler deciding `400 vs 404`.
 
-* `user_id` (individual ownership)
-* `org_id` (organization-level access)
+#### 2. **Repository Pattern (separate SQL from business logic)**
 
-Admins within an org can see all data; staff see only their own.
+Currently services contain both business logic and raw SQL. For a growing ERP, split these:
 
----
+```
+services/bookingService.ts       ← business rules only
+repositories/bookingRepository.ts ← all SQL queries
+```
 
-## 2.4 — Adjust data scoping rules
+This makes testing business logic possible without a database.
 
-| Role                | Data Scope                                            |
-| ------------------- | ----------------------------------------------------- |
-| Admin (`role_id=1`) | All data within their `org_id`                        |
-| Staff               | Only data where `itineraries.user_id = their user_id` |
+#### 3. **Audit Log Table**
 
-This means `getBookings`, `getUserItineraries`, etc. need to check the user's role before deciding the `WHERE` clause.
+ERP systems need a tamper-evident record of who did what. Add:
 
----
-
-## 2.5 — Migration strategy
-
-Write a migration that:
-
-1. Creates the `organizations` table with one row per existing client
-2. Assigns all existing users + itineraries + vendors to their respective `org_id`
-3. Populates `organization_profiles` with the currently-hardcoded values
-
----
-
-# Phase 3 — Extract Hardcoded Configuration
-
-## 3.1 — Move receipt data to the database
-
-Remove the hardcoded bank details from `routes/bookings.ts`.
-
-The receipt generation should query `organization_profiles` for the org of the booking's owner:
-
-```ts
-const profile = await pool.query(
-  `SELECT op.* FROM organization_profiles op
-   INNER JOIN users u ON u.org_id = op.org_id
-   INNER JOIN itineraries i ON i.user_id = u.id
-   INNER JOIN bookings b ON b.itinerary_id = i.id
-   WHERE b.booking_id = $1`,
-  [bookingId]
+```sql
+CREATE TABLE audit_log (
+  id         BIGSERIAL PRIMARY KEY,
+  org_id     INTEGER,
+  user_id    INTEGER,
+  entity     VARCHAR(50),   -- 'booking', 'payment', etc.
+  entity_id  TEXT,
+  action     VARCHAR(20),   -- 'CREATE', 'UPDATE', 'DELETE'
+  diff       JSONB,         -- what changed
+  created_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
----
+Wrap mutations in a service layer that always writes an audit row inside the same transaction.
 
-## 3.2 — Add an Agency Settings page to the frontend
+#### 4. **Structured Error Responses (RFC 7807 Problem Details)**
 
-A new page (admin-only) where each client can configure:
+Standardize all API errors to a single shape:
 
-* Company name
-* Logo upload
-* Bank account details
-* UPI ID
-* Custom terms & conditions for receipts
-
-This is what makes the system white-labelable.
-
----
-
-# Phase 4 — Code Organization Cleanup
-
-## 4.1 — Move PDF/receipt generation out of the route file
-
-Create:
-
-```text
-backend/src/services/pdfService.ts
+```json
+{ "type": "not_found", "title": "Booking Not Found", "status": 404, "detail": "..." }
 ```
 
-### Move these functions:
+This gives the frontend a machine-readable `type` field to drive UI decisions rather than parsing error strings.
 
-* `generateItineraryPDF(itineraryId, userId)`
-* `generateReceiptPDF(bookingId, paymentId, userId)`
+#### 5. **Environment-aware Logging (replace all `console.log`)**
 
-### Route files become thin
+Install `pino` (fast, structured, JSON output) and replace all `console.log`/`console.error` with:
 
 ```ts
-router.get('/:bookingId/client-payments/:paymentId/receipt', authenticate, async (req, res) => {
-  const buffer = await generateReceiptPDF(req.params.bookingId, req.params.paymentId, req.user!.id)
-
-  res.setHeader('Content-Type', 'application/pdf')
-  res.end(buffer, 'binary')
-})
+import pino from 'pino';
+export const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+// logger.info({ bookingId }, 'Payment recorded')
+// logger.error({ err }, 'DB query failed')
 ```
 
----
-
-## 4.2 — Centralize utility functions
-
-Create:
-
-```text
-backend/src/utils/formatters.ts
-```
-
-Move:
-
-* `formatIndian(n)`
-* `numberToWords(n)`
-* `displayDate(dateStr)`
-
-These are currently duplicated across route files.
+This unblocks Phase 1.6 and gives you searchable JSON logs in production.
 
 ---
 
-## 4.3 — Add a validation layer
+### Priority Order for the Remaining Work
 
-Install `zod` and define schemas for each request body.
-
-Example:
-
-```ts
-const ClientPaymentSchema = z.object({
-  clientName: z.string().min(1),
-  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  paymentType: z.enum(['Advance', 'Final', 'Refund', 'Other']),
-  amount: z.number().positive(),
-  paymentMode: z.enum(['UPI', 'Bank Transfer', 'Cash', 'Card', 'Cheque']),
-  referenceUtr: z.string().optional(),
-  packageName: z.string().optional(),
-  remarks: z.string().optional(),
-})
-```
-
-Replace all manual checks like:
-
-```ts
-if (!clientName || !paymentDate ...)
-```
-
-with:
-
-```ts
-schema.parse(req.body)
-```
-
-wrapped in a `validateRequest` middleware.
-
-One schema update applies validation everywhere.
-
----
-
-# Phase 5 — Frontend Hardening
-
-## 5.1 — Move JWT to httpOnly cookie
-
-Currently `localStorage` is used, which is readable by any JavaScript (XSS risk).
-
-### The fix
-
-* Backend:
-
-  * set the token as a `httpOnly; Secure; SameSite=Strict` cookie on login
-
-* Frontend:
-
-  * remove `Authorization` header
-  * cookie is sent automatically
-
-* Add CSRF protection
-
-  * `csurf`
-  * or double-submit cookie pattern
-
----
-
-## 5.2 — Add a refresh token
-
-The current `24h` access token with no refresh means users get logged out mid-day.
-
-### Add
-
-* Short-lived access token (`15 min`)
-* Long-lived refresh token (`7 days`) in `httpOnly` cookie
-* `POST /api/auth/refresh` endpoint that issues a new access token
-
----
-
-## 5.3 — Centralize API error handling on the frontend
-
-Currently every service call has its own:
-
-```ts
-error.response?.data?.error || 'fallback'
-```
-
-pattern.
-
-Add a single Axios response interceptor in a shared file that handles:
-
-* `401` → redirect to login
-* `403` → show permission error
-* `500` → generic toast
-
-centrally.
-
----
-
-# Execution Order
-
-| Priority    | Phase                                | Effort   | Risk if Skipped                               |
-| ----------- | ------------------------------------ | -------- | --------------------------------------------- |
-| 🔴 Critical | Phase 1: Security fixes              | 1–2 days | Any user can see all other users' data        |
-| 🔴 Critical | Phase 2.1–2.3: Org table + JWT       | 2–3 days | Can't support multiple clients safely         |
-| 🟡 High     | Phase 3: Move hardcoded config to DB | 1 day    | Can't use for any other client                |
-| 🟡 High     | Phase 4: Code reorganization         | 2 days   | Maintenance pain accumulates                  |
-| 🟢 Normal   | Phase 5: Frontend hardening          | 2 days   | Acceptable for internal use, risky for public |
-| 🟢 Normal   | Phase 2.4–2.5: Role-based scoping    | 1 day    | Only matters once you have multi-user orgs    |
-
----
-
-# Summary
-
-The single most impactful change is:
-
-* Phase 1.1
-* Phase 1.2
-
-(ownership checks and per-user dashboard)
-
-This is a security bug, not just a design concern. It should be fixed before showing the system to any client.
-
-The second most impactful change is:
-
-* Phase 3
-
-(extract bank details and company name from the code)
-
-Without this, you physically cannot deploy the system for a second client.
-
-Everything in Phase 2 is what makes the system scale to many clients without running separate databases. It's a bigger migration, but the schema is already almost there — you just need the `organizations` table and one FK column on `users`, `itineraries`, and `vendors`.
+| Priority | Item | Risk |
+|---|---|---|
+| 🔴 Critical | Write the missing `CREATE TABLE organizations/organization_profiles` + `ALTER TABLE` migration | Fresh deployments will fail |
+| 🔴 Critical | Fix `registerUser` to assign `org_id` | New users can't be scoped |
+| 🔴 High | Fix `settings.ts` transaction (use pool client) | Data corruption risk under load |
+| 🟡 High | Fix `generateReceiptPDF` to respect admin scope | Admin receipt generation broken |
+| 🟡 High | Add proper logger (Phase 1.6) | Production logs unusable |
+| 🟢 Normal | Custom error classes + error middleware | Code quality |
+| 🟢 Normal | Audit log table | ERP compliance |
+| 🟢 Normal | Pull org name into itinerary HTML | White-label completeness |

@@ -42,7 +42,7 @@ export default function ProtectedRoute({
         return <Navigate to="/" replace />
       }
     } else {
-      if (!requiredRoles.every((r) => hasRole(r))) {
+      if (!requiredRoles.some((r) => hasRole(r))) {
         return <Navigate to="/" replace />
       }
     }

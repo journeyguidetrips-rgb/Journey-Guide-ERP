@@ -13,11 +13,10 @@ export interface OrgSettings {
   terms: string
 }
 
-export async function fetchSettings(): Promise<OrgSettings> {
-  const { data } = await api.get('/settings')
-  return data.settings
-}
+// Fetch settings
+export const fetchSettings = (): Promise<OrgSettings> =>
+  api.get('/settings').then((res) => res.data.settings);
 
-export async function saveSettings(settings: OrgSettings): Promise<void> {
-  await api.put('/settings', settings)
-}
+// Save settings
+export const saveSettings = (settings: OrgSettings): Promise<OrgSettings> =>
+  api.put('/settings', { settings }).then((res) => res.data.settings);

@@ -66,12 +66,6 @@ export default function DashboardTab({ metrics, loading }: DashboardTabProps) {
             <span className="text-sky-700">Conversion Rate</span>
             <span className="font-semibold text-sky-900">{conversionRate}%</span>
           </div>
-          <div className="mt-1 bg-sky-200 rounded-full h-2">
-            <div
-              className="bg-sky-500 h-2 rounded-full transition-all"
-              style={{ width: `${Math.min(parseFloat(conversionRate), 100)}%` }}
-            />
-          </div>
         </div>
       </div>
 
@@ -82,18 +76,12 @@ export default function DashboardTab({ metrics, loading }: DashboardTabProps) {
         </h3>
         <MetricRow label="Total Bookings" value={m?.total_bookings ?? 0} />
         <MetricRow label="Selling Price" value={formatCurrency(m?.total_selling_price ?? 0)} />
-        <MetricRow label="Received" value={formatCurrency(m?.total_received_from_client ?? 0)} color="text-green-600" />
-        <MetricRow label="Balance Due" value={formatCurrency(m?.total_client_balance_due ?? 0)} color="text-red-600" />
+        <MetricRow label="Received" value={formatCurrency(m?.total_received ?? 0)} color="text-green-600" />
+        <MetricRow label="Balance Due" value={formatCurrency(m?.client_balance_due ?? 0)} color="text-red-600" />
         <div className="mt-3 pt-3 border-t border-blue-200">
           <div className="flex justify-between text-sm">
             <span className="text-blue-700">Collection Rate</span>
             <span className="font-semibold text-blue-900">{Number(m?.collection_rate ?? 0).toFixed(1)}%</span>
-          </div>
-          <div className="mt-1 bg-blue-200 rounded-full h-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full transition-all"
-              style={{ width: `${Math.min(Number(m?.collection_rate ?? 0), 100)}%` }}
-            />
           </div>
         </div>
       </div>
@@ -105,17 +93,11 @@ export default function DashboardTab({ metrics, loading }: DashboardTabProps) {
         </h3>
         <MetricRow label="Total Vendor Cost" value={formatCurrency(m?.total_vendor_cost ?? 0)} />
         <MetricRow label="Paid to Vendors" value={formatCurrency(m?.total_paid_to_vendor ?? 0)} color="text-green-600" />
-        <MetricRow label="Vendor Balance" value={formatCurrency(m?.total_vendor_balance_due ?? 0)} color="text-red-600" />
+        <MetricRow label="Vendor Balance" value={formatCurrency(m?.vendor_balance_due ?? 0)} color="text-red-600" />
         <div className="mt-3 pt-3 border-t border-amber-200">
           <div className="flex justify-between text-sm">
             <span className="text-amber-700">Vendor Pay Rate</span>
             <span className="font-semibold text-amber-900">{Number(m?.vendor_pay_rate ?? 0).toFixed(1)}%</span>
-          </div>
-          <div className="mt-1 bg-amber-200 rounded-full h-2">
-            <div
-              className="bg-amber-500 h-2 rounded-full transition-all"
-              style={{ width: `${Math.min(Number(m?.vendor_pay_rate ?? 0), 100)}%` }}
-            />
           </div>
         </div>
       </div>
@@ -126,7 +108,6 @@ export default function DashboardTab({ metrics, loading }: DashboardTabProps) {
           <TrendingUp size={18} /> Profitability
         </h3>
         <MetricRow label="Gross Profit" value={formatCurrency(m?.gross_profit ?? 0)} color="text-green-600" />
-        <MetricRow label="Realised Profit" value={formatCurrency(m?.realised_profit ?? 0)} color="text-green-700" />
         <MetricRow label="Unrealised Profit" value={formatCurrency(m?.unrealised_profit ?? 0)} color="text-gray-600" />
       </div>
 
@@ -135,20 +116,8 @@ export default function DashboardTab({ metrics, loading }: DashboardTabProps) {
         <h3 className="text-lg font-semibold text-purple-900 mb-4 flex items-center gap-2">
           <CheckCircle size={18} /> Completion
         </h3>
-        <MetricRow label="Fully Paid Bookings" value={m?.fully_paid_count ?? 0} color="text-green-600" />
+        <MetricRow label="Fully Paid Bookings" value={m?.completed_bookings ?? 0} color="text-green-600" />
         <MetricRow label="Total Bookings" value={m?.total_bookings ?? 0} />
-      </div>
-
-      {/* ── Reminders ── */}
-      <div className="bg-red-50 p-6 rounded-xl border border-red-100">
-        <h3 className="text-lg font-semibold text-red-900 mb-4 flex items-center gap-2">
-          <Clock size={18} /> Reminders
-        </h3>
-        <MetricRow
-          label="Overdue Reminders"
-          value={m?.overdue_reminders_count ?? 0}
-          color={(m?.overdue_reminders_count ?? 0) > 0 ? 'text-red-600' : 'text-green-600'}
-        />
       </div>
 
       {/* ── Summary ── */}
@@ -158,7 +127,7 @@ export default function DashboardTab({ metrics, loading }: DashboardTabProps) {
         </h3>
         <MetricRow label="Total Revenue" value={formatCurrency(m?.total_selling_price ?? 0)} />
         <MetricRow label="Total Cost" value={formatCurrency(m?.total_vendor_cost ?? 0)} color="text-amber-600" />
-        <MetricRow label="Net Profit" value={formatCurrency(m?.gross_profit ?? 0)} color="text-green-600" />
+        <MetricRow label="Net Profit" value={formatCurrency(m?.net_profit ?? 0)} color="text-green-600" />
       </div>
     </div>
   )

@@ -94,7 +94,7 @@ function App() {
                 <Route
                   path="/settings"
                   element={
-                    <ProtectedRoute requiredRoles={['admin']}>
+                    <ProtectedRoute requiredRoles={['admin', 'superAdmin']}>
                       <Settings />
                     </ProtectedRoute>
                   }
