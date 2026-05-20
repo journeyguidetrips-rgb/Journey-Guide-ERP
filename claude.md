@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Journey Guide ERP is a travel agency management system. It manages itineraries, bookings, client/vendor payments, watermarking flyers, and airport placard generation.
+Journey Guide ERP is a travel agency management system. It manages itineraries, bookings, client/vendor payments, watermarking flyers, and airport placard generation. It is multi-tenant: every user belongs to an `organization`, and data is scoped accordingly.
 
 ## Development Commands
 
@@ -55,6 +55,19 @@ The Vite dev server proxies `/api` requests to `http://localhost:5000`, so durin
 
 The database supports both local PostgreSQL and Neon (cloud). SSL is auto-detected: if `DATABASE_URL` contains `sslmode`, SSL is enabled with `rejectUnauthorized: false`.
 
+## Database Migrations
+
+Migrations live in `backend/migrations/` and must be applied in order on a fresh database:
+
+1. `travel_erp.sql` — base schema (tables: users, roles, permissions, itineraries, bookings, client_payments, vendor_payments)
+2. `phase0_organizations.sql` — organizations + organization_profiles tables; adds `org_id` FK to users, itineraries, vendors
+3. `phase1_security.sql` — updates `get_dashboard_summary()` to scope by `user_id`
+4. `add_vendors.sql` — vendors table
+5. `phase2_multi_tenancy.sql` — assigns existing data to a default org; updates `get_dashboard_summary(p_user_id, p_org_id, p_is_admin)` for org-level scoping
+6. `phase3_agency_settings.sql` — adds `company_name` and `logo_data` columns to `organization_profiles`
+
+All migration files use `IF NOT EXISTS` / `ON CONFLICT` guards and are safe to re-apply.
+
 ## Architecture
 
 ### Data Flow
@@ -63,44 +76,72 @@ The database supports both local PostgreSQL and Neon (cloud). SSL is auto-detect
 Frontend (React/Zustand) --> Vite proxy --> Express API --> PostgreSQL
 ```
 
-Authentication: JWT tokens stored in `localStorage`. The `useUserStore` (Zustand) loads the token on app init and sets it as the default Axios `Authorization` header. All protected API routes use the `authenticate` middleware which validates the JWT and attaches `req.user` (id, email, role_id, permissions[]).
+### Authentication & Security
+
+**Token model**: Login issues two tokens via `Set-Cookie`:
+- `access_token` — httpOnly cookie, 15-minute JWT containing `{ id, email, role_id, org_id, permissions[] }`
+- `refresh_token` — httpOnly cookie, 7-day JWT containing `{ userId }`
+
+The frontend `api.ts` Axios instance sends `withCredentials: true` on every request. On a 401 it attempts `POST /api/auth/refresh` (silent refresh), then retries the original request. On repeated failure it hard-redirects to `/login`.
+
+**CSRF**: Double-submit cookie pattern. The server sets a readable `csrf_token` cookie on login. All non-`/api/auth` mutating requests (POST/PUT/DELETE/PATCH) must echo it as the `X-CSRF-Token` header. The `api.ts` interceptor does this automatically.
+
+**Rate limiting**: 200 requests/minute per IP applied to all `/api` routes via `express-rate-limit`.
+
+**Auth strategy**: Pluggable via `setAuthStrategy(new JwtStrategy())` in `index.ts`. To swap auth mechanisms (e.g. OAuth), implement `AuthStrategy` from `backend/src/auth/strategy.ts` and pass it to `setAuthStrategy`.
+
+**File serving**: Uploaded files are served at `/api/files/:filename` — this route requires authentication and strips path-traversal attempts.
+
+### Request Context
+
+Services access the authenticated user via `AsyncLocalStorage`, not `req.user`. The `authenticate` middleware calls `runWithContext(ctx, next)` once per request. Services call `getContext()` to retrieve `{ userId, email, roleId, orgId, permissions }`.
+
+```ts
+import { getContext } from '../context/requestContext';
+const { userId, orgId } = getContext();
+```
+
+Never pass user identity as function parameters — always use `getContext()`.
 
 ### Backend Structure (`backend/src/`)
 
-- `index.ts` — Express app setup, CORS, middleware registration, route mounting
-- `database/connection.ts` — PostgreSQL pool (singleton, exits process on connection failure)
-- `routes/` — Thin route handlers; delegate all logic to services
-  - `auth.ts` — Login/register
-  - `itineraries.ts` — Itinerary CRUD + PDF generation via Puppeteer
-  - `bookings.ts` — Booking CRUD, payment recording, dashboard summary
-- `services/` — Business logic and all DB queries
-  - `authService.ts` — bcrypt password hashing, JWT sign/verify
-  - `itineraryService.ts` — Itinerary CRUD with paginated, filtered queries
-  - `bookingService.ts` — Booking lifecycle, client/vendor payment recording, dashboard aggregation
-- `middleware/authMiddleware.ts` — `authenticate` (JWT check), `authorize` (permission check), `isAdmin` (role_id === 1)
-- `templates/` — HTML templates for Puppeteer PDF generation (itinerary, receipt)
+- `index.ts` — Express app: CORS, cookie-parser, CSRF middleware, rate limiter, route mounting
+- `auth/strategy.ts` — `AuthStrategy` interface; `auth/jwtStrategy.ts` — cookie/header JWT resolution
+- `context/requestContext.ts` — `AsyncLocalStorage` store: `runWithContext`, `getContext`
+- `database/connection.ts` — PostgreSQL pool singleton
+- `middleware/authMiddleware.ts` — `authenticate` (resolves strategy + sets context), `authorize(perms[])`, `isAdmin` (role_id === 1)
+- `middleware/validateRequest.ts` — Zod schema validation middleware
+- `schemas/` — Zod request schemas (`bookingSchemas.ts`, `itinerarySchemas.ts`)
+- `routes/` — Thin handlers delegating to services: `auth`, `itineraries`, `bookings`, `vendors`, `settings`
+- `services/` — All DB queries and business logic: `authService`, `itineraryService`, `bookingService`, `vendorService`, `pdfService`
+- `templates/` — HTML templates rendered by Puppeteer for PDF generation
 
 ### Frontend Structure (`frontend/src/`)
 
-- `App.tsx` — Root routing: unauthenticated users see only `/login`; authenticated users get Sidebar + Navbar layout with permission-gated routes
-- `stores/userStore.ts` — Single Zustand store for auth state; exposes `hasPermission`, `hasRole`, `hasAnyPermission` helpers used by `ProtectedRoute`
-- `pages/` — One file per top-level route: `Dashboard`, `Finance`, `Itineraries`, `Watermark`, `Placards`, `Logs`
-- `components/finance/` — Tab components consumed by `Finance` page: `DashboardTab`, `BookingsTab`, `PaymentsTab`, `BookingDetailsModal`, `ClientPaymentModal`, `VendorPaymentModal`
-- `components/itineraries/` — `ItineraryCard`, `EditorModal` (markdown editor), `UploadModal`, `ConvertModal` (itinerary → booking), `FilterBar`
-- `hooks/useFinance.ts` — All finance data fetching logic with pagination via `pageRef`/`hasMoreRef`/`fetchLock` refs to prevent double-fetches
-- `hooks/useItineraries.ts` — Itinerary list fetching with same pagination pattern
-- `services/` — Axios call wrappers (no business logic); one file per domain (`bookingService.ts`, `itineraryService.ts`)
-- `types/` — Shared TypeScript interfaces (`finance.ts`, `itinerary.ts`, `booking.ts`)
-- `utils/formatters.ts` — Currency, date, and display formatting utilities
+- `services/api.ts` — Single shared Axios instance with CSRF interceptor and 401 refresh/retry logic; all other services import from here
+- `stores/userStore.ts` — Zustand auth store; `loadFromStorage()` hydrates by calling `GET /api/auth/me` on app mount (no localStorage)
+- `App.tsx` — Root routing: shows only `/login` when unauthenticated; authenticated users get Sidebar + Navbar with permission-gated routes
+- `pages/` — `Dashboard`, `Finance`, `Itineraries`, `Vendors`, `Settings`, `Watermark`, `Placards`, `Logs`
+- `components/finance/` — Tab components for Finance page: `DashboardTab`, `BookingsTab`, `PaymentsTab`, `BookingDetailsModal`, `PaymentDetailModal`, `ClientPaymentModal`, `VendorPaymentModal`
+- `components/itineraries/` — `ItineraryCard`, `EditorModal`, `UploadModal`, `ConvertModal`, `FilterBar`
+- `components/shared/` — `VendorAutocomplete`, `StatusBadge`
+- `hooks/useFinance.ts`, `hooks/useItineraries.ts` — Data fetching with pagination via `pageRef`/`hasMoreRef`/`fetchLock` refs to prevent double-fetches
+- `services/` — Axios wrappers (no business logic): `bookingService`, `itineraryService`, `vendorService`, `settingsService`
+- `types/` — Shared TypeScript interfaces: `finance.ts`, `itinerary.ts`, `booking.ts`, `vendor.ts`
+- `utils/formatters.ts` — Currency, date, and display formatting
 
 ### Key Domain Concepts
 
 **Itinerary lifecycle**: `Draft` → `Published` → `Converted` (when converted to a booking). Revert removes the booking and associated payments, setting status back to `Published`.
 
-**Booking payments**: `bookings` table stores running totals (`received_from_client`, `paid_to_vendor`), but these are always recomputed from `client_payments` / `vendor_payments` aggregate sums on read (the stored columns are updated as a cache for performance). Always trust the aggregated calculation, not the stored column directly.
+**Booking payments**: `bookings` table caches running totals (`received_from_client`, `paid_to_vendor`), but these are always recomputed from `client_payments` / `vendor_payments` aggregate sums on read. Always trust the aggregated calculation.
 
-**Dashboard**: Powered by a PostgreSQL function `get_dashboard_summary()` called from `bookingService.getDashboardSummary()`.
+**Dashboard**: Powered by the PostgreSQL function `get_dashboard_summary(p_user_id, p_org_id, p_is_admin)`. Admins see all org bookings; staff see only their own.
 
-**Permissions**: Stored as a string array on the JWT payload and in `req.user.permissions`. Frontend `ProtectedRoute` uses `useUserStore.hasPermission()` / `hasAnyPermission()`. Backend uses `authorize(requiredPermissions[])` middleware.
+**Multi-tenancy**: `users`, `itineraries`, and `vendors` all carry `org_id`. Services must always filter by `orgId` from `getContext()` to prevent cross-org data leakage.
 
-**PDF generation**: Backend uses Puppeteer to render `backend/templates/itinerary.html` to PDF. The `marked` library converts Markdown content to HTML before injection.
+**Permissions**: String array in the JWT payload and in `RequestContext`. Backend: `authorize(['permission_name'])` middleware. Frontend: `useUserStore.hasPermission()` / `hasAnyPermission()` via `ProtectedRoute`.
+
+**Settings** (`/api/settings`): Admin-only. Reads/writes `organizations.name` and `organization_profiles` (bank details, UPI, address, logo as base64 data URI).
+
+**PDF generation**: `pdfService.ts` uses Puppeteer to render `backend/templates/itinerary.html`. The `marked` library converts Markdown content to HTML before template injection.
