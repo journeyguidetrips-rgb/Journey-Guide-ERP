@@ -10,6 +10,7 @@ import {
   publishItinerary,
   convertToBooking,
   revertToPublished,
+  getItinerary
 } from '../services/itineraryService'
 import { Itinerary } from '../types/itinerary'
 import { ConvertToBookingRequest, ApiErrorResponse } from '../types/booking'
@@ -124,11 +125,21 @@ export default function Itineraries() {
     }
   }
 
-  const handleEdit = (itinerary: Itinerary) => {
-    setSelectedItinerary(itinerary)
-    setEditContent(itinerary.content)
-    setSourceContent(itinerary.source_content)
-    setShowEditor(true)
+  const handleEdit = async (itinerary: Itinerary) => {
+    try {
+      const { data } = await getItinerary(itinerary.id);
+
+      console.log(data);
+
+      if (data.success) {
+        setSelectedItinerary(data.itinerary)
+        setEditContent(data.itinerary.edited_md_content)
+        setSourceContent(data.itinerary.source_md_content)
+        setShowEditor(true)
+      }
+    } catch {
+      toast.error('Failed to fetch itinerary')
+    }
   }
 
   const handleSave = async () => {

@@ -45,3 +45,7 @@ frontend/temp/
 # Ignore build artifacts
 backend/dist/
 frontend/dist/
+
+# Ignore DB files
+Overview.md
+travel_erp.sql

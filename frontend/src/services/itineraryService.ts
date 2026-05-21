@@ -1,5 +1,5 @@
 import { api } from './api'
-import { Itinerary } from '../types/itinerary'
+import { Itinerary, ItineraryDetails } from '../types/itinerary'
 import { ConvertToBookingRequest } from '../types/booking'
 
 export const fetchItineraries = (params: URLSearchParams) =>
@@ -9,6 +9,9 @@ export const uploadItinerary = (formData: FormData) =>
   api.post('/itineraries/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+
+export const getItinerary = (id: string) =>
+  api.get<{ payments: ItineraryDetails; total: number }>(`/itineraries/${id}`)
 
 export const updateItinerary = (id: string, content: string) =>
   api.put(`/itineraries/${id}`, { content })

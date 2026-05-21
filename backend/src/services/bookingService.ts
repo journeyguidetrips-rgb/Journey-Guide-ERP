@@ -227,7 +227,7 @@ export const convertItineraryToBooking = async (data: ConvertToBookingData) => {
 
     const { condition, value } = itineraryScopeCondition(roleId, userId, orgId);
     const itineraryResult = await client.query(
-      `SELECT * FROM itineraries WHERE id = $2 AND ${condition} AND status = 'Published'`,
+      `SELECT * FROM itineraries i WHERE i.id = $2 AND ${condition} AND i.status = 'Published'`,
       [value, itineraryId]
     );
     if (itineraryResult.rows.length === 0)
@@ -254,7 +254,7 @@ export const convertItineraryToBooking = async (data: ConvertToBookingData) => {
     );
 
     await client.query(
-      `UPDATE itineraries SET status = 'Converted', updated_at = NOW() WHERE id = $1`,
+      `UPDATE itineraries i SET status = 'Converted', updated_at = NOW() WHERE i.id = $1`,
       [itineraryId]
     );
 
@@ -277,7 +277,7 @@ export const revertBookingToItinerary = async (itineraryId: string) => {
 
     const { condition, value } = itineraryScopeCondition(roleId, userId, orgId);
     const itineraryResult = await client.query(
-      `SELECT * FROM itineraries WHERE id = $2 AND ${condition} AND status = 'Converted'`,
+      `SELECT * FROM itineraries i WHERE i.id = $2 AND ${condition} AND i.status = 'Converted'`,
       [value, itineraryId]
     );
     if (itineraryResult.rows.length === 0)

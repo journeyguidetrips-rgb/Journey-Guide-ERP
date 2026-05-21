@@ -5,8 +5,10 @@ import { pool } from '../database/connection';
 import { getContext } from '../context/requestContext';
 import { getItinerary } from './itineraryService';
 import { formatIndian, numberToWords, displayDate } from '../utils/formatters';
+import { marked } from 'marked';
 
 const templateDir = path.join(process.cwd(), 'templates');
+const logoFile = path.join(process.cwd(), 'templates', 'logo.png');
 
 async function launchBrowser() {
   return puppeteer.launch({
@@ -17,11 +19,31 @@ async function launchBrowser() {
 
 export async function generateItineraryPDF(itineraryId: string): Promise<Buffer> {
   const itinerary = await getItinerary(itineraryId);
-  if (!itinerary) throw new Error('Itinerary not found');
+  const templateFile = path.join(templateDir, 'itinerary.html');
+
+  if (!itinerary) 
+    throw new Error('Itinerary not found');
+
+  const htmlBody = marked(itinerary.edited_md_content);
+
+  const logoBuffer = await fs.readFile(logoFile);
+  const logoBase64 = logoBuffer.toString('base64');
+  const logoSrc = `data:image/png;base64,${logoBase64}`;
+
+  const { orgId } = getContext();
+  const orgResult = await pool.query('SELECT name FROM organizations WHERE id = $1', [orgId]);
+  const orgName = orgResult.rows[0]?.name || 'Journey Guide';
+
+  const template = await fs.readFile(templateFile, 'utf-8');
+  const finalHtml = template
+    .replace('{{title}}', orgName)
+    .replace('{{meta-tags}}', '')
+    .replace('{{logoBase64}}', `${logoSrc}`)
+    .replace('{{body}}', htmlBody);
 
   const browser = await launchBrowser();
   const page = await browser.newPage();
-  await page.setContent(itinerary.html_content, { waitUntil: 'networkidle0' });
+  await page.setContent(finalHtml, { waitUntil: 'networkidle0' });
   await page.emulateMediaType('screen');
 
   const dimensions = await page.evaluate(() => ({

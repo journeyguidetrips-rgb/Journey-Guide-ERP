@@ -16,9 +16,9 @@ interface GetItinerariesFilters {
  */
 const scopeCondition = (roleId: number, userId: number, orgId: number): { condition: string; value: number } => {
   if (roleId === 1) {
-    return { condition: 'org_id = $1', value: orgId };
+    return { condition: 'i.org_id = $1', value: orgId };
   }
-  return { condition: 'user_id = $1', value: userId };
+  return { condition: 'i.user_id = $1', value: userId };
 };
 
 export const createItinerary = async (
@@ -28,9 +28,7 @@ export const createItinerary = async (
 ) => {
   const { userId, orgId } = getContext();
   const result = await pool.query(
-    `INSERT INTO itineraries (id, user_id, org_id, vendor_name, client_name, source_content, content, status)
-     VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $5, 'Draft')
-     RETURNING *`,
+    `SELECT create_itinerary($1, $2, $3, $4, $5);`,    
     [userId, orgId, vendorName, clientName, content]
   );
   return result.rows[0];
@@ -40,21 +38,44 @@ export const getItinerary = async (id: string) => {
   const { userId, orgId, roleId } = getContext();
   const { condition, value } = scopeCondition(roleId, userId, orgId);
   const result = await pool.query(
-    `SELECT * FROM itineraries WHERE id = $2 AND ${condition}`,
+    `SELECT
+      i.id,
+      i.user_id,
+      i.org_id,
+      i.vendor_name,
+      i.client_name,
+      i.status,
+      i.created_at,
+      convert_from(ic.content, 'UTF8') AS source_md_content,
+      convert_from(ie.content, 'UTF8') AS edited_md_content
+    FROM 
+      itineraries i
+      LEFT JOIN itinerary_contents ic ON i.id = ic.itinerary_id AND ic.content_type = 'source_md'
+      LEFT JOIN itinerary_contents ie ON i.id = ie.itinerary_id AND ie.content_type = 'edited_md'
+    WHERE 
+      i.id = $2 AND ${condition}`,
     [value, id]
   );
   return result.rows[0];
 };
 
-export const updateItinerary = async (id: string, content: string, template: string) => {
+export const updateItinerary = async (id: string, content: string) => {
   const { userId, orgId, roleId } = getContext();
   const { condition, value } = scopeCondition(roleId, userId, orgId);
   const result = await pool.query(
-    `UPDATE itineraries
-     SET content = $3, updated_at = CURRENT_TIMESTAMP, html_content = $4
-     WHERE id = $2 AND ${condition}
-     RETURNING *`,
-    [value, id, content, template]
+    `UPDATE 
+      public.itinerary_contents ic
+    SET
+      content = convert_to($3, 'UTF-8'),
+      updated_at = CURRENT_TIMESTAMP
+    FROM 
+      public.itineraries i
+    WHERE
+      ic.itinerary_id = $2
+      AND ic.content_type = 'edited_md'
+      AND ${condition}
+    RETURNING *;`,
+    [value, id, content]
   );
   return result.rows[0];
 };
@@ -62,13 +83,15 @@ export const updateItinerary = async (id: string, content: string, template: str
 export const publishItinerary = async (id: string) => {
   const { userId, orgId, roleId } = getContext();
   const { condition, value } = scopeCondition(roleId, userId, orgId);
+
   const result = await pool.query(
-    `UPDATE itineraries
+    `UPDATE itineraries i
      SET status = 'Published', updated_at = CURRENT_TIMESTAMP
-     WHERE id = $2 AND ${condition}
+     WHERE i.id = $2 AND ${condition}
      RETURNING *`,
     [value, id]
   );
+  
   return result.rows[0];
 };
 
@@ -76,7 +99,7 @@ export const deleteItinerary = async (id: string) => {
   const { userId, orgId, roleId } = getContext();
   const { condition, value } = scopeCondition(roleId, userId, orgId);
   const result = await pool.query(
-    `DELETE FROM itineraries WHERE id = $2 AND ${condition} RETURNING id`,
+    `DELETE FROM itineraries i WHERE i.id = $2 AND ${condition} RETURNING id`,
     [value, id]
   );
   return (result.rowCount ?? 0) > 0;
@@ -99,22 +122,22 @@ export const getUserItineraries = async ({
   let paramIndex = 2;
 
   if (search) {
-    conditions.push(`client_name ILIKE $${paramIndex}`);
+    conditions.push(`i.client_name ILIKE $${paramIndex}`);
     filterValues.push(`%${search}%`);
     paramIndex++;
   }
   if (vendor) {
-    conditions.push(`vendor_name ILIKE $${paramIndex}`);
+    conditions.push(`i.vendor_name ILIKE $${paramIndex}`);
     filterValues.push(`%${vendor}%`);
     paramIndex++;
   }
   if (status) {
-    conditions.push(`status = $${paramIndex}`);
+    conditions.push(`i.status = $${paramIndex}`);
     filterValues.push(status);
     paramIndex++;
   }
   if (date) {
-    conditions.push(`DATE(created_at) = $${paramIndex}`);
+    conditions.push(`i.DATE(created_at) = $${paramIndex}`);
     filterValues.push(date);
     paramIndex++;
   }
@@ -122,14 +145,26 @@ export const getUserItineraries = async ({
   const whereClause = conditions.join(' AND ');
 
   const dataQuery = `
-    SELECT * FROM itineraries
-    WHERE ${whereClause}
-    ORDER BY created_at DESC
+    SELECT
+      i.id,
+      i.user_id,
+      i.org_id,
+      i.vendor_name,
+      i.client_name,
+      i.status,
+      i.created_at
+    FROM 
+      itineraries i
+    WHERE 
+      ${whereClause}
+    ORDER BY 
+      i.created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
   `;
+
   const dataResult = await pool.query(dataQuery, [...filterValues, limit, offset]);
 
-  const countQuery = `SELECT COUNT(*) FROM itineraries WHERE ${whereClause}`;
+  const countQuery = `SELECT COUNT(*) FROM itineraries i WHERE ${whereClause}`;
   const countResult = await pool.query(countQuery, filterValues);
   const total = parseInt(countResult.rows[0].count, 10);
 
