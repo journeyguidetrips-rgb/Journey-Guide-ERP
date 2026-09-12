@@ -186,6 +186,7 @@ router.put<{ bookingId: string; paymentId: string }>(
     try {
       const { bookingId, paymentId } = req.params;
       const { clientName, paymentDate, paymentType, amount, paymentMode, referenceUtr, packageName, remarks } = req.body;
+      
       const updated = await updateClientPayment(bookingId, parseInt(paymentId), {
         clientName, paymentDate, paymentType, amount, paymentMode, referenceUtr, packageName, remarks,
       });

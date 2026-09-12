@@ -78,6 +78,7 @@ Migrations live in `backend/migrations/` and must be applied in order on a fresh
 4. `add_vendors.sql` — vendors table
 5. `phase2_multi_tenancy.sql` — assigns existing data to a default org; updates `get_dashboard_summary(p_user_id, p_org_id, p_is_admin)` for org-level scoping
 6. `phase3_agency_settings.sql` — adds `company_name` and `logo_data` columns to `organization_profiles`
+7. **New:** `itinerary_contents.sql` — adds `itinerary_contents` table for storing large `.md` files separately.
 
 All migration files use `IF NOT EXISTS` / `ON CONFLICT` guards and are safe to re-apply.
 
@@ -89,6 +90,12 @@ All migration files use `IF NOT EXISTS` / `ON CONFLICT` guards and are safe to r
 
 ```
 Frontend (React/Zustand) --> Vite proxy --> Express API --> PostgreSQL
+                                      |
+                                      v
+                              itineraries (metadata)
+                                      |
+                                      v
+                          itinerary_contents (.md files)
 ```
 
 ### Authentication & Security
@@ -131,7 +138,7 @@ Never pass user identity as function parameters — always use `getContext()`.
 - `middleware/validateRequest.ts` — Zod schema validation middleware
 - `schemas/` — Zod request schemas (`bookingSchemas.ts`, `itinerarySchemas.ts`)
 - `routes/` — Thin handlers delegating to services: `auth`, `itineraries`, `bookings`, `vendors`, `settings`
-- `services/` — All DB queries and business logic: `authService`, `itineraryService`, `bookingService`, `vendorService`, `pdfService`
+- `services/` — All DB queries and business logic: `authService`, `itineraryService`, `bookingService`, `vendorService`, `pdfService`, `**itineraryContentService**`
 - `templates/` — HTML templates rendered by Puppeteer for PDF generation
 
 ---
@@ -146,15 +153,66 @@ Never pass user identity as function parameters — always use `getContext()`.
 - `components/itineraries/` — `ItineraryCard`, `EditorModal`, `UploadModal`, `ConvertModal`, `FilterBar`
 - `components/shared/` — `VendorAutocomplete`, `StatusBadge`
 - `hooks/useFinance.ts`, `hooks/useItineraries.ts` — Data fetching with pagination via `pageRef`/`hasMoreRef`/`fetchLock` refs to prevent double-fetches
-- `services/` — Axios wrappers (no business logic): `bookingService`, `itineraryService`, `vendorService`, `settingsService`
+- `services/` — Axios wrappers (no business logic): `bookingService`, `itineraryService`, `vendorService`, `settingsService`, `**itineraryContentService**`
 - `types/` — Shared TypeScript interfaces: `finance.ts`, `itinerary.ts`, `booking.ts`, `vendor.ts`
 - `utils/formatters.ts` — Currency, date, and display formatting
+
+---
+
+## Database Schema
+
+### Core Tables
+
+#### **Itinerary Management**
+
+- `**itineraries**` — Travel itineraries created and maintained by users.
+  - Key Columns:
+    - `id` (UUID)
+    - `user_id` (UUID, foreign key to `users.id`)
+    - `org_id` (UUID, foreign key to `organizations.id`)
+    - `source_md_id` (UUID, foreign key to `itinerary_contents.id`)
+    - `edited_md_id` (UUID, foreign key to `itinerary_contents.id`)
+    - `status` (VARCHAR: `Draft`, `Published`, `Converted`)
+    - `created_at`, `updated_at`
+  - **Note**: Large `.md` content is stored in the `itinerary_contents` table.
+- `**itinerary_contents**` — Stores large `.md` files separately from metadata to optimize performance.
+  - Columns:
+    - `id` (UUID, primary key)
+    - `itinerary_id` (UUID, foreign key to `itineraries.id` with `ON DELETE CASCADE`)
+    - `content_type` (VARCHAR: `'source_md'` or `'edited_md'`)
+    - `content` (TEXT: The `.md` file content)
+    - `created_at` (TIMESTAMPTZ)
+    - `updated_at` (TIMESTAMPTZ)
+  - Indexes: `idx_itinerary_contents_itinerary_id`, `idx_itinerary_contents_content_type`
+
+#### **Booking Management**
+
+- `**bookings**` — Converted bookings with dual payment tracking.
+  - Key Columns:
+    - `booking_id` (TEXT, format: JG-0001, JG-0002, etc.)
+    - `itinerary_id` (UUID, foreign key to `itineraries.id`)
+    - `client_name`, `vendor_name`, `package_name`
+    - `travel_date`, `guests`, `phone`, `whatsapp`, `notes`
+    - **Financial**: `selling_price`, `vendor_cost`, `received_from_client`, `paid_to_vendor`
+    - `client_status` — Payment status tracking
+    - `created_by` (UUID), `created_at`, `updated_at`
+  - Foreign Key: `itinerary_id` (itineraries) ON DELETE CASCADE
+
+#### **Payment Management**
+
+- `**client_payments**` — Track all payments received from clients.
+- `**vendor_payments**` — Track all payments made to vendors.
 
 ---
 
 ## Key Domain Concepts
 
 **Itinerary lifecycle**: `Draft` → `Published` → `Converted` (when converted to a booking). Revert removes the booking and associated payments, setting status back to `Published`.
+
+**Content Storage**:
+
+- `.md` files are stored in `itinerary_contents` (not in `itineraries`).
+- HTML is generated **at runtime** (not stored) when users download PDFs.
 
 **Booking payments**: `bookings` table caches running totals (`received_from_client`, `paid_to_vendor`), but these are always recomputed from `client_payments` / `vendor_payments` aggregate sums on read. Always trust the aggregated calculation.
 
@@ -166,7 +224,20 @@ Never pass user identity as function parameters — always use `getContext()`.
 
 **Settings** (`/api/settings`): Admin-only. Reads/writes `organizations.name` and `organization_profiles` (bank details, UPI, address, logo as base64 data URI).
 
-**PDF generation**: `pdfService.ts` uses Puppeteer to render `backend/templates/itinerary.html`. The `marked` library converts Markdown content to HTML before template injection.
+**PDF generation**: `pdfService.ts` uses Puppeteer to render `backend/templates/itinerary.html`. The `marked` library converts Markdown content to HTML before template injection. **No HTML is stored in the database; conversion happens at runtime.**
+
+---
+
+## Content Management
+
+### Saving `.md` Files
+
+- Insert into `itinerary_contents` with `content_type = 'source_md'` or `'edited_md'`.
+- Update `itineraries.source_md_id` or `itineraries.edited_md_id` with the new `content_id`.
+
+### Fetching `.md` Files
+
+- Join `itineraries` with `itinerary_contents` to fetch content only when needed (lazy loading).
 
 ---
 
@@ -174,5 +245,14 @@ Never pass user identity as function parameters — always use `getContext()`.
 
 ### May 2026
 
-- Updated `get_dashboard_summary` to include `total_itineraries` (counts all itineraries, including those not converted to bookings).
-- Changed `INNER JOIN` to `LEFT JOIN` for `bookings` in the function to ensure all itineraries are counted.
+- **Database Optimization**:
+  - Separated large `.md` content into a new `itinerary_contents` table.
+  - Removed `source_content`, `content`, and `html_content` columns from `itineraries`.
+  - Added `source_md_id` and `edited_md_id` to `itineraries` as references to `itinerary_contents`.
+- **PDF Generation**:
+  - Switched to **runtime conversion** of `.md` → HTML → PDF.
+  - Removed stored HTML from the database (optimizes storage and performance).
+  - Uses `marked` for `.md` → HTML and `puppeteer` for HTML → PDF.
+- **Dashboard Updates**:
+  - Updated `get_dashboard_summary` to include `total_itineraries` (counts all itineraries, including non-converted ones).
+  - Uses `LEFT JOIN` to include itineraries without bookings.

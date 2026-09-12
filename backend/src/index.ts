@@ -13,6 +13,7 @@ import itineraryRoutes from './routes/itineraries';
 import bookingsRoutes from './routes/bookings';
 import vendorRoutes from './routes/vendors';
 import settingsRoutes from './routes/settings';
+import adminRouter from './routes/admin';
 
 // Load environment variables
 dotenv.config();
@@ -140,6 +141,9 @@ app.use('/api/vendors', vendorRoutes);
 
 // Settings routes (admin-only)
 app.use('/api/settings', settingsRoutes);
+
+// Add admin routes
+app.use('/api/admin', adminRouter);
 
 // Authenticated file serving — replaces the removed public /uploads static route
 app.get('/api/files/:filename', authenticate, (req: Request, res: Response) => {

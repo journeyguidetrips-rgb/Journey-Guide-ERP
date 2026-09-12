@@ -4,7 +4,7 @@ import path from 'path';
 import { pool } from '../database/connection';
 import { getContext } from '../context/requestContext';
 import { getItinerary } from './itineraryService';
-import { formatIndian, numberToWords, displayDate } from '../utils/formatters';
+import { formatIndian, numberToWords, displayDate, toDateOnlyStr } from '../utils/formatters';
 import { marked } from 'marked';
 
 const templateDir = path.join(process.cwd(), 'templates');
@@ -106,19 +106,19 @@ export async function generateReceiptPDF(bookingId: string, paymentId: string): 
   const totalReceived = previouslyPaid + amount;
   const balanceDue = Math.max(0, sellingPrice - totalReceived);
 
-  const paymentDateStr = displayDate(new Date(String(payment.payment_date)).toISOString().split('T')[0]);
-  const today = displayDate(new Date().toISOString().split('T')[0]);
+  const paymentDateStr = displayDate(toDateOnlyStr(payment.payment_date));
+  const today = displayDate(new Date().toISOString().split('T')[0]); // fine as-is — this is "now", not a stored date
   const receiptNo = `JG-${String(new Date().toISOString()).replace(/-/g, '').slice(0, 8)}-${String(payment.id).padStart(4, '0')}`;
   const packageName = payment.package_name || booking.package_name || booking.client_name || '—';
   const phone = booking.phone || booking.whatsapp || '—';
   const travelDateDisplay = booking.travel_date
-    ? displayDate(new Date(String(booking.travel_date)).toISOString().split('T')[0])
+    ? displayDate(toDateOnlyStr(booking.travel_date))
     : '—';
 
   const receiptBody = `
     <h1>PAYMENT RECEIPT</h1>
     <p>Dear <strong>${payment.client_name}</strong>,</p>
-    <p>We sincerely thank you for your payment of <strong>₹ ${formatIndian(amount)}</strong>,
+    <p>We sincerely thank you for your payment of <strong>₹ ${formatIndian(totalReceived)}</strong>,
        which we have received and noted.</p>
     <p>Thank you for choosing us for your tour package needs. We look forward to serving you.</p>
     <hr/>
@@ -148,7 +148,7 @@ export async function generateReceiptPDF(bookingId: string, paymentId: string): 
         <tr><td style="font-weight:700">Payment Type</td><td>${payment.payment_type}</td></tr>
         <tr><td style="font-weight:700">Payment Mode</td><td>${payment.payment_mode}</td></tr>
         <tr><td style="font-weight:700">Transaction ID</td><td>${payment.reference_utr || '—'}</td></tr>
-        <tr><td style="font-weight:700">Payment Date</td><td>${displayDate(paymentDateStr)}</td></tr>
+        <tr><td style="font-weight:700">Payment Date</td><td>${paymentDateStr}</td></tr>
       </tbody>
     </table>
 

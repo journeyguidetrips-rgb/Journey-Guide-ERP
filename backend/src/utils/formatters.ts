@@ -38,6 +38,23 @@ export function numberToWords(amount: number): string {
 export function displayDate(dateStr: string): string {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const d = new Date(dateStr);
-  return `${String(d.getUTCDate()).padStart(2, '0')} ${months[d.getUTCMonth()]}, ${d.getUTCFullYear()}`;
+
+  if (!dateStr) return '—';
+
+  const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
+  if (!year || !month || !day) return '—';
+
+  return `${String(day).padStart(2, '0')} ${months[month - 1]}, ${year}`;
+}
+
+// Helper: safely turn a pg `date` column value (Date object or string) into 'YYYY-MM-DD'
+export function toDateOnlyStr(value: Date | string): string {
+  if (value instanceof Date) {
+    // pg 'date' columns are parsed as LOCAL midnight — use local getters, not UTC
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return value.split('T')[0];
 }

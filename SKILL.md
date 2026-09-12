@@ -14,11 +14,11 @@ This skill covers development, integration, and enhancement work with the **Jour
 
 The Journey Guide ERP handles the complete lifecycle of travel bookings:
 
-1. **Itinerary Management** — Users create and publish travel itineraries
-2. **Booking Conversion** — Itineraries convert to bookings with pricing and vendor assignments
-3. **Vendor Management** — Track vendors, contacts, and vendor-specific pricing
-4. **Payment Tracking** — Dual-ledger system for client and vendor payments
-5. **Financial Reconciliation** — Real-time balance calculations and payment histories
+1. **Itinerary Management** — Users create and publish travel itineraries.
+2. **Booking Conversion** — Itineraries convert to bookings with pricing and vendor assignments.
+3. **Vendor Management** — Track vendors, contacts, and vendor-specific pricing.
+4. **Payment Tracking** — Dual-ledger system for client and vendor payments.
+5. **Financial Reconciliation** — Real-time balance calculations and payment histories.
 
 ---
 
@@ -45,15 +45,28 @@ The Journey Guide ERP handles the complete lifecycle of travel bookings:
 
 #### **Itinerary Management**
 
-- `**itineraries**` — Travel itineraries created and maintained by users
-  - Key Columns: `id` (UUID), `user_id`, `org_id`, `title`, `description`, `status` (Draft/Published/Converted), `created_at`, `updated_at`
-  - Lifecycle: Draft → Published → Converted (to booking)
-  - Foreign Keys: `user_id` (users), `org_id` (organizations)
-  - Indexes: `idx_itineraries_user_id`, `idx_itineraries_status`
+- `**itineraries**` — Travel itineraries created and maintained by users.
+  - Key Columns:
+    - `id` (UUID)
+    - `user_id` (UUID, foreign key to `users.id`)
+    - `org_id` (UUID, foreign key to `organizations.id`)
+    - `source_md_id` (UUID, foreign key to `itinerary_contents.id`)
+    - `edited_md_id` (UUID, foreign key to `itinerary_contents.id`)
+    - `status` (VARCHAR: `Draft`, `Published`, `Converted`)
+    - `created_at`, `updated_at`
+  - **Note**: Large `.md` content is stored in the `itinerary_contents` table.
+- `**itinerary_contents**` — Stores large `.md` files separately from metadata.
+  - Key Columns:
+    - `id` (UUID)
+    - `itinerary_id` (UUID, foreign key to `itineraries.id` with `ON DELETE CASCADE`)
+    - `content_type` (VARCHAR: `'source_md'` or `'edited_md'`)
+    - `content` (TEXT: The `.md` file content)
+    - `created_at`, `updated_at` (TIMESTAMPTZ)
+  - Indexes: `idx_itinerary_contents_itinerary_id`, `idx_itinerary_contents_content_type`
 
 #### **Booking Management**
 
-- `**bookings**` — Converted bookings with dual payment tracking
+- `**bookings**` — Converted bookings with dual payment tracking.
   - Key Columns:
     - `booking_id` (TEXT, format: JG-0001, JG-0002, etc.) — auto-generated via `booking_id_seq`
     - `itinerary_id` (UUID) — link to source itinerary
@@ -66,9 +79,6 @@ The Journey Guide ERP handles the complete lifecycle of travel bookings:
     - `created_at`, `updated_at`
   - Foreign Key: `itinerary_id` (itineraries) ON DELETE CASCADE
   - Indexes: `idx_bookings_booking_id`, `idx_bookings_client_name`, `idx_bookings_travel_date`, `idx_bookings_reminder_date_balance`
-  - **Computed Fields** (via views/functions):
-    - `client_balance_due` = `selling_price - received_from_client`
-    - `vendor_balance_due` = `vendor_cost - paid_to_vendor`
 
 #### **Vendor Management**
 
@@ -181,12 +191,6 @@ The Journey Guide ERP handles the complete lifecycle of travel bookings:
 
 ---
 
-### Sequences
-
-- `**booking_id_seq**` — Auto-incrementing sequence for booking IDs (starts at 1, incremented to generate JG-0001, JG-0002, etc.)
-
----
-
 ## Common Development Tasks
 
 ---
@@ -284,16 +288,71 @@ ORDER BY v.name;
 
 ---
 
+#### Itinerary Management Queries
+
+##### Insert a New Itinerary with `.md` Content
+
+```sql
+-- Step 1: Insert itinerary metadata
+INSERT INTO itineraries (id, user_id, org_id, status)
+VALUES (uuid_generate_v4(), $1, $2, 'Draft')
+RETURNING id;
+
+-- Step 2: Insert .md content
+INSERT INTO itinerary_contents (id, itinerary_id, content_type, content)
+VALUES (uuid_generate_v4(), (SELECT id FROM itineraries WHERE id = $3), 'source_md', $4);
+```
+
+##### Fetch Itinerary Metadata (Fast)
+
+```sql
+SELECT id, title, status, created_at
+FROM itineraries
+WHERE org_id = $1;
+```
+
+##### Fetch Itinerary with `.md` Content (Lazy Loading)
+
+```sql
+SELECT
+    i.id, i.title, i.status,
+    ic.content AS source_md
+FROM itineraries i
+LEFT JOIN itinerary_contents ic ON i.source_md_id = ic.id AND ic.content_type = 'source_md'
+WHERE i.id = $1;
+```
+
+##### Update `.md` Content
+
+```sql
+UPDATE itinerary_contents
+SET content = $1, updated_at = NOW()
+WHERE itinerary_id = $2 AND content_type = 'edited_md'
+RETURNING *;
+```
+
+##### Delete an Itinerary (Cascades to `itinerary_contents`)
+
+```sql
+DELETE FROM itineraries
+WHERE id = $1 AND user_id = $2
+RETURNING id;
+```
+
+---
+
 ### API Integration Points
 
 **Common endpoints you'll work with:**
 
 1. **Itinerary Management**
-  - `POST /api/itineraries` — Create new itinerary
-  - `GET /api/itineraries/:id` — Retrieve single itinerary
-  - `PUT /api/itineraries/:id` — Update itinerary
+  - `POST /api/itineraries` — Create new itinerary (metadata only)
+  - `GET /api/itineraries/:id` — Retrieve single itinerary (metadata only)
+  - `PUT /api/itineraries/:id` — Update itinerary metadata
   - `PATCH /api/itineraries/:id/publish` — Publish itinerary (status → Published)
   - `GET /api/itineraries` — List itineraries with filters (status, user_id, org_id)
+  - `GET /api/itineraries/:id/md` — Fetch `.md` content for an itinerary
+  - `PUT /api/itineraries/:id/md` — Update `.md` content for an itinerary
 2. **Booking Management**
   - `POST /api/bookings/convert` — Convert itinerary to booking (calls `convert_itinerary_to_booking()`)
   - `GET /api/bookings/:id` — Retrieve booking details (calls `get_booking_details()`)
@@ -315,6 +374,8 @@ ORDER BY v.name;
   - `GET /api/reports/outstanding-payments` — Outstanding balances
   - `GET /api/reports/bookings-by-date` — Bookings grouped by travel date
   - `GET /api/reports/vendor-payables` — Total payables by vendor
+6. **PDF Generation**
+  - `GET /api/itineraries/:id/pdf` — Download itinerary as PDF (runtime conversion of `.md` → HTML → PDF)
 
 ---
 
@@ -353,6 +414,16 @@ ORDER BY v.name;
 - Use in API middleware to authorize actions
 - Permission names: e.g., "create_booking", "edit_vendor", "view_reports"
 
+### 6. **Lazy-Loading Large Content**
+
+- Large `.md` files are stored in a separate table (`itinerary_contents`).
+- Metadata (e.g., `title`, `status`) is stored in `itineraries` for fast queries.
+- Content is **lazy-loaded** only when needed (e.g., editing or downloading).
+- **Benefits**:
+  - Faster queries for listing itineraries.
+  - Reduced database size.
+  - Scalable for large files.
+
 ---
 
 ## Working with the Code
@@ -382,9 +453,13 @@ src/
 ├── api/
 │   ├── bookings/          -- Booking CRUD and conversion
 │   ├── itineraries/       -- Itinerary management
+│   │   ├── itineraryService.ts  -- Handles metadata (e.g., status updates)
+│   │   └── itineraryContentService.ts  -- Handles `.md` content (e.g., save/fetch from `itinerary_contents`)
 │   ├── vendors/           -- Vendor CRUD
 │   ├── payments/          -- Client & vendor payment handling
 │   ├── reports/           -- Financial reports
+│   ├── pdf/               -- PDF generation
+│   │   └── pdfService.ts  -- Converts `.md` to HTML to PDF at runtime
 │   └── auth/              -- Authentication & RBAC
 ├── database/
 │   ├── functions/         -- PL/pgSQL function definitions
@@ -445,6 +520,15 @@ src/
 4. Generate CSV/PDF reports
 5. Export for accounting reconciliation
 
+### Scenario 5: Downloading an Itinerary as PDF
+
+1. User requests PDF download for itinerary `X` (GET /api/itineraries/X/pdf).
+2. Backend fetches `.md` content from `itinerary_contents` where `itinerary_id = X` and `content_type = 'edited_md'`.
+3. Backend converts `.md` to HTML using `marked`.
+4. Backend applies a template (e.g., adds headers, footers, styling).
+5. Backend converts HTML to PDF using `puppeteer`.
+6. PDF is returned to the user (no HTML stored in DB).
+
 ---
 
 ## Testing Considerations
@@ -457,6 +541,7 @@ src/
 - Test concurrent booking conversions (sequence integrity)
 - Test payment functions with missing booking (should raise exception)
 - Test trigger sync: insert payment → verify booking totals update
+- Test lazy-loading of `.md` content: verify metadata queries are fast.
 
 ### API Testing
 
@@ -464,13 +549,14 @@ src/
 - Verify multi-tenancy: user from Org A cannot access Org B bookings
 - Test RBAC: endpoint returns 403 if user lacks permission
 - Test payment validation: amount > 0, date reasonable
+- Test PDF generation: verify `.md` → HTML → PDF conversion works.
 
 ### Data Integrity
 
 - Verify balance calculations: selling_price = received + balance
 - Verify vendor balance: vendor_cost = paid + balance
 - Verify running totals in JSONB payment arrays
-- Test cascading deletes: delete itinerary → bookings delete
+- Test cascading deletes: delete itinerary → verify `itinerary_contents` rows are also deleted.
 
 ---
 
@@ -505,6 +591,12 @@ src/
 - Bookings: No explicit status in table, but `client_status` field exists for payment status tracking
 - Ensure status transitions are validated in API layer
 
+### Content Storage
+
+- `.md` files are stored in `itinerary_contents` (not in `itineraries`).
+- Use `source_md_id` and `edited_md_id` in `itineraries` to reference the content.
+- HTML is **not stored** in the database; it is generated at runtime for PDF downloads.
+
 ---
 
 ## Bugs Fixed (May 2026)
@@ -529,6 +621,7 @@ The following issues identified in the validation report were resolved:
 3. `phase1_security.sql` — scoped dashboard function
 4. `phase2_multi_tenancy.sql` — seeds default org, updates dashboard function
 5. `phase3_agency_settings.sql` — any subsequent settings migrations
+6. **New:** `itinerary_contents.sql` — creates `itinerary_contents` table for storing `.md` files.
 
 ### 2. `registerUser` now assigns `org_id` (Critical)
 
@@ -557,6 +650,14 @@ Admins can now generate receipts for bookings created by any staff member in the
 
 ### May 2026
 
-- Updated `get_dashboard_summary` to include `total_itineraries` (counts all itineraries, including those not converted to bookings).
-- Changed `INNER JOIN` to `LEFT JOIN` for `bookings` in the function to ensure all itineraries are counted.
-- Updated documentation to reflect the new `total_itineraries` field in the dashboard summary.
+- **Database Optimization**:
+  - Added `itinerary_contents` table to store `.md` files separately from metadata.
+  - Removed `source_content`, `content`, and `html_content` columns from `itineraries`.
+  - Added `source_md_id` and `edited_md_id` to `itineraries` as references to `itinerary_contents`.
+- **PDF Generation**:
+  - Switched to **runtime conversion** of `.md` → HTML → PDF.
+  - Removed stored HTML from the database (optimizes storage and performance).
+  - Uses `marked` for `.md` → HTML and `puppeteer` for HTML → PDF.
+- **Dashboard Updates**:
+  - Updated `get_dashboard_summary` to include `total_itineraries` (counts all itineraries, including non-converted ones).
+  - Uses `LEFT JOIN` to include itineraries without bookings.

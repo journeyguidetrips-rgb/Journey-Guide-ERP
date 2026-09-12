@@ -7,10 +7,10 @@ import { useUserStore } from '../stores/userStore'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login, isAuthenticated } = useUserStore()
+  const { login, hasRole, isAuthenticated } = useUserStore()
   
-  const [email, setEmail] = useState('amit.pampatwar@journeyguide.com')
-  const [password, setPassword] = useState('Password@1234')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
@@ -35,7 +35,10 @@ export default function Login() {
         // Token is stored in httpOnly cookie by the server; just save user info
         login(response.data.user)
         toast.success(`Welcome, ${response.data.user.firstName}!`)
-        navigate('/')
+        if (hasRole('superAdmin')) 
+          navigate('/admin')
+        else 
+          navigate('/')
       }
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Login failed')
@@ -43,11 +46,6 @@ export default function Login() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const fillDemoCredentials = () => {
-    setEmail('amit.pampatwar@journeyguide.com')
-    setPassword('Password@1234')
   }
 
   return (

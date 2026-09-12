@@ -15,6 +15,11 @@ import Vendors from './pages/Vendors'
 import Settings from './pages/Settings'
 import { Toaster } from 'react-hot-toast'
 import { useUserStore } from './stores/userStore'
+import UserManagement from './components/admin/UserManagement';
+import RoleManagement from './components/admin/RoleManagement';
+import PermissionManagement from './components/admin/PermissionManagement';
+import OrganizationManagement from './components/admin/OrganizationManagement';
+import AdminDashboard from './pages/AdminDashboard'
 
 function App() {
   const { loadFromStorage, isAuthenticated, isLoading } = useUserStore()
@@ -99,7 +104,20 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route path="*" element={<Navigate to="/" />} />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute requiredRoles={['superAdmin']}>
+                      <AdminDashboard />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<UserManagement />} />  // Default: Loads users
+                  <Route path="users" element={<UserManagement />} />
+                  <Route path="roles" element={<RoleManagement />} />
+                  <Route path="permissions" element={<PermissionManagement />} />
+                  <Route path="organizations" element={<OrganizationManagement />} />
+                </Route>
               </Routes>
             </main>
           </div>

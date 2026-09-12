@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import { useUserStore } from '../stores/userStore'
 
 const menuItems = [
+  { path: '/admin', label: 'Admin Dashboard', icon: Settings, permission: null, adminOnly: false, isSuperAdmin: true },
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, permission: 'view_dashboard' },
   { path: '/payments', label: 'Payments', icon: CreditCard, permission: 'view_payments' },
   { path: '/itineraries', label: 'Itineraries', icon: MapPin, permission: 'view_itineraries' },
@@ -11,16 +12,32 @@ const menuItems = [
   { path: '/watermark', label: 'Watermark', icon: Palette, permission: 'manage_watermarks' },
   { path: '/placards', label: 'Placards', icon: Tag, permission: 'manage_placards' },
   { path: '/logs', label: 'Logs', icon: Archive, permission: 'view_logs' },
-  { path: '/settings', label: 'Settings', icon: Settings, permission: null, adminOnly: true },
+  { path: '/settings', label: 'Settings', icon: Settings, permission: null, adminOnly: true, isSuperAdmin: true },
 ]
+
+export const DEFAULT_PATHS = {
+  superAdmin: '/admin',
+  user: '/dashboard'
+};
 
 export default function Sidebar() {
   const location = useLocation()
-  const { user, hasPermission, hasAnyPermission, hasRole } = useUserStore()
+  const { user, hasPermission, hasRole } = useUserStore()
 
   // Filter menu items based on user permissions
   const visibleMenuItems = menuItems.filter((item) => {
-    if (item.adminOnly) return hasRole('admin')
+    const isSuperAdmin = hasRole('superAdmin');
+    const isAdmin = hasRole('admin') || isSuperAdmin;
+
+    // Admin Dashboard: Only for SuperAdmin
+    if (item.path === '/admin') {
+      return isSuperAdmin;
+    }
+    // Settings: For both Admin and SuperAdmin
+    if (item.path === '/settings') {
+      return isAdmin;
+    }
+
     if (!item.permission) return true
     // Check if user has any manage_* permission for view_* items
     if (item.permission.startsWith('view_')) {

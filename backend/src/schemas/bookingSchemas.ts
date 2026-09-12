@@ -6,9 +6,9 @@ export const ClientPaymentSchema = z.object({
   paymentType: z.enum(['Advance', 'Final', 'Refund', 'Other']),
   amount: z.number().positive('Amount must be positive'),
   paymentMode: z.enum(['UPI', 'Bank Transfer', 'Cash', 'Card', 'Cheque']),
-  referenceUtr: z.string().optional(),
-  packageName: z.string().optional(),
-  remarks: z.string().optional(),
+  referenceUtr: z.string().nullable().optional(),
+  packageName: z.string().nullable().optional(),
+  remarks: z.string().nullable().optional(),
 });
 
 export const VendorPaymentSchema = z.object({

@@ -38,12 +38,14 @@ export const authenticate = async (
   next: NextFunction
 ): Promise<void> => {
   if (!_strategy) {
+    console.log("500 Here");
     res.status(500).json({ error: 'Auth strategy not configured' });
     return;
   }
 
   const ctx = await _strategy.resolve(req);
   if (!ctx) {
+    console.log("401 Here");
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }

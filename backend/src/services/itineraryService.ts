@@ -62,19 +62,36 @@ export const getItinerary = async (id: string) => {
 export const updateItinerary = async (id: string, content: string) => {
   const { userId, orgId, roleId } = getContext();
   const { condition, value } = scopeCondition(roleId, userId, orgId);
+
   const result = await pool.query(
-    `UPDATE 
-      public.itinerary_contents ic
-    SET
-      content = convert_to($3, 'UTF-8'),
-      updated_at = CURRENT_TIMESTAMP
-    FROM 
-      public.itineraries i
-    WHERE
-      ic.itinerary_id = $2
-      AND ic.content_type = 'edited_md'
-      AND ${condition}
-    RETURNING *;`,
+    `WITH updated_content AS (
+      UPDATE public.itinerary_contents ic
+      SET
+        content = convert_to($3, 'UTF-8'),
+        updated_at = CURRENT_TIMESTAMP
+      FROM 
+        public.itineraries i        
+      WHERE
+        ic.itinerary_id = $2
+        AND ic.content_type = 'edited_md'
+        AND ${condition}
+      RETURNING itinerary_id, content 
+    )
+    SELECT
+      i.id,
+      i.user_id,
+      i.org_id,
+      i.vendor_name,
+      i.client_name,
+      i.status,
+      i.created_at,
+      convert_from(ic.content, 'UTF8') AS source_md_content,
+      convert_from(uc.content, 'UTF8') AS edited_md_content
+    FROM itineraries i
+      INNER JOIN updated_content uc ON i.id = uc.itinerary_id 
+      LEFT JOIN itinerary_contents ic ON i.id = ic.itinerary_id AND ic.content_type = 'source_md'
+    WHERE 
+      i.id = $2; `,
     [value, id, content]
   );
   return result.rows[0];
