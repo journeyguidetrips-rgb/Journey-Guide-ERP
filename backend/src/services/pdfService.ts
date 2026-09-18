@@ -21,8 +21,9 @@ export async function generateItineraryPDF(itineraryId: string): Promise<Buffer>
   const itinerary = await getItinerary(itineraryId);
   const templateFile = path.join(templateDir, 'itinerary.html');
 
-  if (!itinerary) 
+  if (!itinerary) {
     throw new Error('Itinerary not found');
+  }
 
   const htmlBody = marked(itinerary.edited_md_content);
 
@@ -31,36 +32,67 @@ export async function generateItineraryPDF(itineraryId: string): Promise<Buffer>
   const logoSrc = `data:image/png;base64,${logoBase64}`;
 
   const { orgId } = getContext();
-  const orgResult = await pool.query('SELECT name FROM organizations WHERE id = $1', [orgId]);
+
+  const orgResult = await pool.query(
+    'SELECT name FROM organizations WHERE id = $1',
+    [orgId]
+  );
+
   const orgName = orgResult.rows[0]?.name || 'Journey Guide';
 
   const template = await fs.readFile(templateFile, 'utf-8');
+
   const finalHtml = template
     .replace('{{title}}', orgName)
     .replace('{{meta-tags}}', '')
-    .replace('{{logoBase64}}', `${logoSrc}`)
+    .replace('{{logoBase64}}', logoSrc)
     .replace('{{body}}', htmlBody);
 
   const browser = await launchBrowser();
-  const page = await browser.newPage();
-  await page.setContent(finalHtml, { waitUntil: 'networkidle0' });
-  await page.emulateMediaType('screen');
 
-  const dimensions = await page.evaluate(() => ({
-    width: Math.ceil(document.documentElement.scrollWidth),
-    height: Math.ceil(document.body.scrollHeight),
-  }));
+  try {
+    const page = await browser.newPage();
 
-  const pdfBuffer = await page.pdf({
-    width: `${dimensions.width}px`,
-    height: `${dimensions.height}px`,
-    printBackground: true,
-    margin: { top: 0, right: 0, bottom: 0, left: 0 },
-  });
+    await page.setContent(finalHtml, {
+      waitUntil: 'networkidle0',
+    });
 
-  await browser.close();
-  return Buffer.from(pdfBuffer);
+    await page.emulateMediaType('screen');
+
+    // Wait until all fonts have finished loading before measuring the page.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
+
+    // Measure the actual PDF container rather than the entire HTML document.
+    const dimensions = await page.evaluate(() => {
+      const element = document.querySelector('.jg-page') as HTMLElement;
+      const rect = element.getBoundingClientRect();
+
+      return {
+        width: Math.ceil(rect.width),
+        height: Math.ceil(rect.height),
+      };
+    });
+
+    const pdfBuffer = await page.pdf({
+      width: `${dimensions.width}px`,
+      height: `${dimensions.height}px`,
+      printBackground: true,
+      margin: {
+        top: '0px',
+        right: '0px',
+        bottom: '0px',
+        left: '0px',
+      },
+    });
+
+    return Buffer.from(pdfBuffer);
+  } finally {
+    await browser.close();
+  }
 }
+
 
 export async function generateReceiptPDF(bookingId: string, paymentId: string): Promise<{ buffer: Buffer; filename: string }> {
   const { userId, orgId, roleId } = getContext();

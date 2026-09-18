@@ -10,6 +10,10 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
 
   <style>
+    @page {
+      margin: 0;
+    }
+    
     /* ── Brand tokens ── */
     :root {
       --jg-navy:       #0D1B4B;
@@ -205,16 +209,20 @@
       flex-shrink: 0;
     }
 
-    /* ── H4: Activity heading — gold-bordered pill badge + text ── */
+    /* ── Unique H4: Gold Accent Card Tag ── */
     .jg-body h4 {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 8px;
-      margin: 10px 0 5px;
-      font-size: 16.5px;
+      gap: 10px;
+      margin: 18px 0 10px;
+      padding: 6px 14px;
+      font-size: 15px;
       font-weight: 600;
       color: var(--jg-navy);
-      padding: 0;
+      background: var(--jg-gold-faint);
+      border-left: 4px solid var(--jg-gold);
+      border-radius: 0 6px 6px 0;
+      letter-spacing: 0.5px;
     }
 
     .jg-activity-type {
@@ -291,20 +299,29 @@
     }
     .jg-body table tfoot td:last-child { text-align: right; }
 
-    /* ── Lists ── */
+    /* Replace your .jg-body ul and .jg-body ul li CSS rules with this: */
     .jg-body ul {
-      list-style: none; padding: 0; margin: 8px 0 14px;
+      list-style-type: disc; /* Uses native HTML bullet dot */
+      padding-left: 20px;    /* Provides standard indentation */
+      margin: 8px 0 14px;
     }
+
     .jg-body ul li {
-      font-size: 17.25px; color: var(--jg-ink); line-height: 1.75;
-      padding: 4px 0 4px 15px; position: relative;
+      font-size: 17.25px;
+      color: var(--jg-ink);
+      line-height: 1.75;
+      padding: 4px 0;
       border-bottom: 1px solid var(--jg-rule);
     }
-    .jg-body ul li:last-child { border-bottom: none; }
-    .jg-body ul li::before {
-      content: ""; position: absolute; left: 0; top: 12px;
-      width: 5px; height: 5px; border-radius: 50%;
-      background: var(--jg-gold);
+
+    .jg-body ul li:last-child {
+      border-bottom: none;
+    }
+
+    /* Color the native bullet dot directly without affecting alignment */
+    .jg-body ul li::marker {
+      color: var(--jg-gold);
+      font-size: 1.1em; /* Adjust bullet size natively if needed */
     }
     .jg-body ol { margin: 8px 0 14px 16px; padding: 0; }
     .jg-body ol li {
